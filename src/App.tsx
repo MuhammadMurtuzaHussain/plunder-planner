@@ -11,17 +11,20 @@ import { TodayPanel } from './components/TodayPanel.tsx';
 import { Method } from './components/Method.tsx';
 import { Hunt } from './components/Hunt.tsx';
 
+// Shareable links: ?start=empty opens the plan without a locker, ?mode=hunt the token-hunt view, ?want=winter a season.
+const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+
 interface Engine { cat: Catalog; f: Forecast; base: Baseline; themes: Uint8Array }
 
 export default function App() {
   const [engine, setEngine] = useState<Engine | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [locker, setLocker] = useState<Locker | null>(null);
-  const [started, setStarted] = useState(false);            // true once a locker is read or skipped
+  const [started, setStarted] = useState(query.get('start') === 'empty');            // true once a locker is read or skipped
   const [off, setOff] = useState<Set<string>>(new Set());   // filter chips switched off
   const [selected, setSelected] = useState<number | null>(null);
-  const [want, setWant] = useState<Set<string>>(new Set());  // seasonal themes the player is after
-  const [mode, setMode] = useState<'have' | 'hunt'>('have');   // does the player hold a token yet?
+  const [want, setWant] = useState<Set<string>>(() => new Set((query.get('want') ?? '').split(',').filter(k => THEMES.some(t => t.key === k))));  // seasonal themes the player is after
+  const [mode, setMode] = useState<'have' | 'hunt'>(query.get('mode') === 'hunt' ? 'hunt' : 'have');   // does the player hold a token yet?
 
   useEffect(() => {
     let alive = true;
