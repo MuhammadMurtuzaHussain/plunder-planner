@@ -92,7 +92,8 @@ node scripts/train.ts
 
 fortnite.gg blocks scripted downloads, so `data/raw/fngg/all.en.js` has to be saved from a normal browser
 session at `https://fortnite.gg/data/items/all.en.js`. The drop odds and Treasure Hour times in
-`src/lib/hunt.ts` are constants and need a manual edit if Epic changes them.
+`src/lib/hunt.ts` are constants and need a manual edit if Epic changes them. The Treasure Hour boost for
+upcoming hours is unconfirmed (past ones were 1.5x or 2x), so the calculator lets you choose.
 
 ## Credits
 

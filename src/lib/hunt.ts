@@ -4,7 +4,9 @@
  * They are plain constants so they are easy to update if Epic changes them.
  */
 export const BASE_ODDS = 137_500;           // 1 in N per chest opened in a normal match
-export const TREASURE_MULTIPLIER = 1.5;     // Pirate Shop Access boost during a Treasure Hour
+/** Boosts seen so far for Pirate Shop Access. Epic has not confirmed the boost for upcoming Treasure Hours. */
+export const SEEN_MULTIPLIERS = [1.5, 2] as const;
+export const DEFAULT_MULTIPLIER = 1.5;      // the lower, more common one
 export const TREASURE_HOUR_LENGTH_H = 2;
 export const MATCHES_PER_TREASURE_HOUR = 6; // rough: a 2-hour window fits about six matches
 export const HUNT_ENDS = Date.UTC(2026, 11, 5, 14, 0);
@@ -14,7 +16,7 @@ export const TREASURE_HOURS: number[] = [
   Date.UTC(2026, 10, 28, 19, 0), Date.UTC(2026, 10, 29, 2, 0),
 ];
 
-export interface HuntPlan { chestsPerMatch: number; matchesPerDay: number; treasureHours: number }
+export interface HuntPlan { chestsPerMatch: number; matchesPerDay: number; treasureHours: number; multiplier: number }
 export interface HuntOdds {
   daysLeft: number; normalChests: number; boostedChests: number;
   chance: number;          // probability of at least one drop before the hunt ends
@@ -31,7 +33,7 @@ export function huntOdds(plan: HuntPlan, now: number): HuntOdds {
   const normalChests = plan.chestsPerMatch * plan.matchesPerDay * daysLeft;
   const boostedChests = plan.treasureHours * MATCHES_PER_TREASURE_HOUR * plan.chestsPerMatch;
   const p = 1 / BASE_ODDS;
-  const miss = Math.pow(1 - p, normalChests) * Math.pow(1 - p * TREASURE_MULTIPLIER, boostedChests);
+  const miss = Math.pow(1 - p, normalChests) * Math.pow(1 - p * plan.multiplier, boostedChests);
   const chance = 1 - miss;
   return { daysLeft, normalChests, boostedChests, chance, oneIn: chance > 0 ? 1 / chance : Infinity, chestsForEven: Math.log(0.5) / Math.log(1 - p) };
 }

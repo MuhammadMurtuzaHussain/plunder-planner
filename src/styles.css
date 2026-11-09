@@ -109,6 +109,9 @@ b, strong { font-weight: 600; }
 .slider label { display: flex; justify-content: space-between; gap: 12px; font-size: 0.88rem; font-weight: 600; margin-bottom: 8px; }
 .slider label b { font: 600 0.9rem/1.4 var(--mono); color: var(--accent); }
 .slider input { width: 100%; accent-color: var(--accent); height: 24px; margin: 0; }
+.slider-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 8px; }
+.mode.small { margin-top: 0; background: var(--bg); }
+.mode.small button { height: 32px; }
 .slider-help { color: var(--faint); font-size: 0.78rem; margin-top: 4px; }
 .odds-big { font: 400 clamp(2.4rem, 1.6rem + 3vw, 3.4rem)/1.05 var(--display); color: var(--accent); font-variant-numeric: tabular-nums; margin: 4px 0 6px; }
 .odds-result .muted { font-size: 0.88rem; }

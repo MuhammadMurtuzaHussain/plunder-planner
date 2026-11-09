@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TreasureChest } from '@phosphor-icons/react';
-import { BASE_ODDS, HUNT_ENDS, TREASURE_HOUR_LENGTH_H, TREASURE_MULTIPLIER, countdown, huntOdds, upcomingTreasureHours } from '../lib/hunt.ts';
+import { BASE_ODDS, DEFAULT_MULTIPLIER, HUNT_ENDS, SEEN_MULTIPLIERS, TREASURE_HOUR_LENGTH_H, countdown, huntOdds, upcomingTreasureHours } from '../lib/hunt.ts';
 import { est, fmt } from '../lib/analysis.ts';
 
 function useNow() {
@@ -31,7 +31,8 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
   const [cpm, setCpm] = useState(6);
   const [mpd, setMpd] = useState(5);
   const [th, setTh] = useState(Math.min(2, hours.length));
-  const odds = huntOdds({ chestsPerMatch: cpm, matchesPerDay: mpd, treasureHours: Math.min(th, hours.length) }, now);
+  const [mult, setMult] = useState<number>(DEFAULT_MULTIPLIER);
+  const odds = huntOdds({ chestsPerMatch: cpm, matchesPerDay: mpd, treasureHours: Math.min(th, hours.length), multiplier: mult }, now);
   const over = now >= HUNT_ENDS;
   const pct = odds.chance * 100;
   const pctText = pct >= 10 ? pct.toFixed(0) : pct >= 1 ? pct.toFixed(1) : pct.toFixed(2);
@@ -39,7 +40,7 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
   return (
     <section className="wrap section" id="hunt">
       <h2>Still hunting for a token</h2>
-      <p className="section-lede">Pirate Shop Access drops from chests in normal matches at 1 in {fmt(BASE_ODDS)}. Treasure Hours raise that {TREASURE_MULTIPLIER}x.</p>
+      <p className="section-lede">Pirate Shop Access drops from chests in normal matches at 1 in {fmt(BASE_ODDS)}. Treasure Hours raise that: past ones gave 1.5x or 2x, and the boost for upcoming ones is not confirmed.</p>
 
       <div className="hunt-grid">
         <div className="hunt-col">
@@ -58,13 +59,13 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
           </div>
 
           <div className="card">
-            <header className="card-head"><h3>Treasure Hours</h3><p>Announced boosts, in your timezone</p></header>
+            <header className="card-head"><h3>Treasure Hours</h3><p>Announced times, in your timezone. Boost size not confirmed.</p></header>
             {hours.length ? (
               <ul className="rows">
                 {hours.map((t, k) => (
                   <li key={t}>
                     <span className="row-main">{slot(t)}</span>
-                    <span className="row-side"><span className="up">{TREASURE_MULTIPLIER}x</span>{k === 0 && <span className="badge gold">{live ? 'Live' : 'Next'}</span>}</span>
+                    <span className="row-side"><span className="up">Boosted</span>{k === 0 && <span className="badge gold">{live ? 'Live' : 'Next'}</span>}</span>
                   </li>
                 ))}
               </ul>
@@ -80,6 +81,13 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
               <Slider id="mpd" label="Matches per day" value={mpd} min={0} max={40} onChange={setMpd} />
               <Slider id="th" label="Treasure Hours you will play" value={Math.min(th, hours.length)} min={0} max={Math.max(hours.length, 0)} onChange={setTh}
                 help="Counted as about six extra matches each, at boosted odds." />
+              <div className="slider">
+                <p className="slider-title" id="mult-label">Boost to assume</p>
+                <div className="mode small" role="group" aria-labelledby="mult-label">
+                  {SEEN_MULTIPLIERS.map(m => <button key={m} type="button" aria-pressed={mult === m} onClick={() => setMult(m)}>{m}x</button>)}
+                </div>
+                <p className="slider-help">Unconfirmed for upcoming hours. 1.5x is the cautious choice.</p>
+              </div>
             </div>
             <div className="odds-result" aria-live="polite">
               <p className="cap">Chance of a token</p>
