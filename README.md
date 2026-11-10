@@ -5,7 +5,7 @@ Item Shop access would unlock the most cosmetics you do not already own.
 
 **Live site: https://muhammadmurtuzahussain.github.io/plunder-planner/**
 
-![Plunder Planner: locker input, best 14 days for each pass, and the forecast chart](docs/overview.png)
+![Plunder Planner: say what you want, then one clear answer with the items you are likely to get](docs/overview.png)
 
 ## What it does
 
@@ -17,11 +17,19 @@ Item Shop access would unlock the most cosmetics you do not already own.
   - *No locker:* tick the groups you own most of (Marvel, winter, Chapter 1 originals and so on) and add
     single items with the search.
 - **Nothing leaves your browser.** No account, no server, no tracking, no AI model.
-- **Ranks every 14-day pass through 2027.** Each start date gets an expected value: everything the shop should
-  sell in those 14 days, minus what you already own. You get one pick for the 2026 pass (which must be claimed by Dec 15, 2026) and one for 2027.
+- **One clear answer.** "Claim it on Dec 15", the reasons, and the item art you are likely to get, for the 2026
+  pass (which must be claimed by Dec 15, 2026) and the 2027 one.
+- **A year you can drag across.** The whole calendar as one strip, brighter where a start date is better. The
+  list of likely items changes as you move.
+- **"When is it coming back?" for any item.** Click an item for every past shop visit and its chance month
+  by month. Add it to a wishlist to see its curve across the year.
+- **Things to take away.** A share image of your plan and a calendar reminder for the claim date, both made
+  in the browser.
+- **The receipts.** Last year's forecast, made only from earlier data, drawn against what the shop really sold.
 - **Shows what you would likely get.** For any fortnight, the items most likely to be on sale that are new to
   you, each with its chance, plus the items you own that are likely to take up shelf space.
-- **Answers "should I start today?"** Compares the live shop with the last year of days for your locker.
+- **Claim or wait.** A daily call that compares the live shop with the last year of days for your locker, with a
+  countdown to the 2026 claim deadline.
 - **Helps players still hunting for a token.** Treasure Hour countdown, the announced schedule in your
   timezone, and a calculator for your chance of a drop before the hunt ends.
 - **Collabs or originals.** Count only licensed crossovers, or only Fortnite's own designs, if that is what you
@@ -39,9 +47,13 @@ asks for an Epic login, and the import button and the no-locker mode avoid those
 
 ![Treasure Hour countdown, schedule and odds calculator](docs/hunt.png)
 
-### Seasonal picker
+### Chasing a season
 
-![Calendar ranked by winter items, peaking in mid December](docs/seasonal.png)
+![The plan ranked by winter items, with the year strip glowing in December](docs/seasonal.png)
+
+### Item pages
+
+![Krampus: chance by month and every past shop visit](docs/item.png)
 
 ## Shareable links
 
@@ -50,6 +62,7 @@ asks for an Epic login, and the import button and the no-locker mode avoid those
 | `?start=empty` | The plan for an empty locker |
 | `?start=empty&mode=hunt` | The token-hunt view |
 | `?start=empty&source=collab` | Only collab items counted (also `original`) |
+| `?item=Krampus` | That item's page: past visits and chance by month |
 | `?start=empty&want=winter` | The calendar ranked by winter items (also `halloween`, `summer`, `valentine`, `spring`) |
 
 ## How the estimate works

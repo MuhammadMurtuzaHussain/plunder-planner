@@ -1,10 +1,13 @@
 import { fmt } from '../lib/analysis.ts';
 import type { Catalog } from '../lib/types.ts';
+import type { Receipts as ReceiptData } from '../lib/analysis.ts';
+import { Receipts } from './Receipts.tsx';
 
-export function Method({ cat }: { cat: Catalog | null }) {
+export function Method({ cat, receipts }: { cat: Catalog | null; receipts: ReceiptData | null }) {
   return (
     <section className="wrap section method" id="method">
       <h2>How the estimate works, and how far to trust it</h2>
+      {cat && receipts && <Receipts cat={cat} data={receipts} />}
       <div className="method-grid">
         <article className="method-wide">
           <h3>What a pass is worth</h3>

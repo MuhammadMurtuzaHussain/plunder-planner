@@ -45,7 +45,7 @@ export function hydrate(raw: RawCatalog): Catalog {
     let d = 0;
     for (let k = 0; k < r.h.length; k++) { d += r.h[k]; days[k] = d; }
     const { h: _h, ...rest } = r;
-    return { ...rest, idx, days };
+    return { ...rest, n: rest.n.trim(), idx, days };
   });
   const byFngg = new Map<number, Item>();
   for (const it of items) byFngg.set(it.g, it);

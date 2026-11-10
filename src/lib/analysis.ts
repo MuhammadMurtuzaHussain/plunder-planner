@@ -1,5 +1,5 @@
 /** Everything the screens need, derived from the catalogue + a locker. */
-import { WINDOW, dateToDay, dayToDate, passes, type Filter, type Forecast, type WindowScore } from './model.ts';
+import { WINDOW, dateToDay, dayToDate, forecast, baseline, historicTotals, passes, scoreWindows, type Filter, type Forecast, type WindowScore } from './model.ts';
 import type { Catalog, Item, ItemType } from './types.ts';
 
 export const TYPE_LABEL: Record<ItemType, string> = {
@@ -175,6 +175,7 @@ export interface TodayCheck {
   typical: number;         // median day
   expectedPass: number;    // what a pass started now tends to add up to, given today's shelf
   typicalPass: number;
+  recent: number[];        // the same figure for each of the last 30 days, oldest first
 }
 /** How does the shop right now compare with the last year of days, for this locker? */
 export function todayCheck(cat: Catalog, owned: Uint8Array, filter: Filter): TodayCheck {
@@ -207,6 +208,7 @@ export function todayCheck(cat: Catalog, owned: Uint8Array, filter: Filter): Tod
   const sorted = [...recent].sort((a, b) => a - b);
   return {
     day: cat.lastDay, onSale, value,
+    recent: recent.slice(-30),
     percentile: recent.filter(v => v < value).length / recent.length,
     typical: sorted[sorted.length >> 1],
     expectedPass: my + slope * (value - mx),
@@ -219,4 +221,46 @@ export function lockerStats(cat: Catalog, ids: Set<number> | null, owned: Uint8A
   let shopItems = 0, shopValue = 0; const by = new Map<ItemType, number>();
   for (const it of cat.items) if (owned[it.idx]) { shopItems++; shopValue += it.p; by.set(it.t, (by.get(it.t) ?? 0) + 1); }
   return { read: ids?.size ?? 0, shopItems, shopValue, byType: [...by].map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n) };
+}
+
+/** One item's chance across every candidate window. */
+export interface Outlook { best: number; bestP: number; series: Float32Array }
+export function itemOutlook(f: Forecast, idx: number): Outlook {
+  const W = f.starts.length, series = new Float32Array(W);
+  let best = 0;
+  for (let w = 0; w < W; w++) { series[w] = f.p[w * f.nItems + idx]; if (series[w] > series[best]) best = w; }
+  return { best, bestP: series[best], series };
+}
+/** Highest chance of a 14-day pass catching the item, per calendar month of the start date. */
+export function monthlyChance(cat: Catalog, f: Forecast, idx: number): { label: string; p: number }[] {
+  const out: { label: string; p: number; key: string }[] = [];
+  for (let w = 0; w < f.starts.length; w++) {
+    const d = dayToDate(cat.epoch, f.starts[w]), key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+    const p = f.p[w * f.nItems + idx];
+    const last = out[out.length - 1];
+    if (last && last.key === key) last.p = Math.max(last.p, p); else out.push({ key, label: MONTH[d.getUTCMonth()], p });
+  }
+  return out.slice(0, 14);
+}
+/** Every separate visit to the shop, as [year, day of year]. */
+export function visits(cat: Catalog, it: Item): { year: number; doy: number }[] {
+  const out: { year: number; doy: number }[] = [];
+  for (let k = 0; k < it.days.length; k++) if (k === 0 || it.days[k] - it.days[k - 1] > 3) {
+    const d = dayToDate(cat.epoch, it.days[k]);
+    out.push({ year: d.getUTCFullYear(), doy: Math.round((d.getTime() - Date.UTC(d.getUTCFullYear(), 0, 1)) / 86400000) });
+  }
+  return out;
+}
+
+/** "Receipts": forecast the last year using only what was known before it, next to what really happened. */
+export interface Receipts { starts: Int32Array; predicted: number[]; actual: number[]; avgMiss: number }
+export function receipts(cat: Catalog): Receipts {
+  const asOf = cat.lastDay - 365 - WINDOW;
+  const starts = Int32Array.from({ length: 365 }, (_, k) => asOf + 1 + k);
+  const all: Filter = { types: new Set(cat.items.map(i => i.t)), source: 'all' };
+  const predicted = scoreWindows(cat, forecast(cat, asOf, starts), baseline(cat, asOf, starts), new Uint8Array(cat.items.length), all).map(s => s.total);
+  const totals = [...historicTotals(cat, cat.lastDay).values()];
+  const actual = Array.from(starts, s => totals.reduce((a, arr) => a + arr[s], 0));
+  const avgMiss = actual.reduce((a, v, i) => a + Math.abs(predicted[i] - v) / v, 0) / actual.length;
+  return { starts, predicted, actual, avgMiss };
 }

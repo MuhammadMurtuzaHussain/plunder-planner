@@ -9,10 +9,11 @@ interface Props {
   cat: Catalog | null; loadError: string | null; locker: Locker | null; stats: LockerStats | null;
   ownedKinds: Set<string>; onOwnedKinds: (s: Set<string>) => void;
   onLocker: (l: Locker) => void; onSkip: () => void;
+  wantPanel: React.ReactNode;   // seasons, collab families and item search, owned by the app
 }
 type Tab = 'import' | 'link' | 'none';
 
-export function Hero({ mode, onMode, cat, loadError, locker, stats, ownedKinds, onOwnedKinds, onLocker, onSkip }: Props) {
+export function Hero({ mode, onMode, cat, loadError, locker, stats, ownedKinds, onOwnedKinds, onLocker, onSkip, wantPanel }: Props) {
   const [tab, setTab] = useState<Tab>('import');
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -44,17 +45,29 @@ export function Hero({ mode, onMode, cat, loadError, locker, stats, ownedKinds, 
 
   return (
     <section className="wrap hero">
-      <h1>Spend your Pirate Shop Access on the right 14 days</h1>
-      <p className="lede">Tell us what you own. We check nine years of Item Shop history against it and rank every fortnight.</p>
+      <h1>X marks your best 14 days</h1>
+      <p className="lede">Say what you want from the Item Shop. Nine years of shop history show when to spend your Pirate Shop Access.</p>
 
       <div className="mode" role="group" aria-label="Do you have a token yet?">
         <button type="button" aria-pressed={mode === 'have'} onClick={() => onMode('have')}>I have a token</button>
         <button type="button" aria-pressed={mode === 'hunt'} onClick={() => { onMode('hunt'); goto('hunt'); }}>Still hunting</button>
       </div>
 
+      <ul className="ribbon" aria-label="Items on sale in the shop right now">
+        {shelf.length ? shelf.map((it, k) => (
+          <li key={it.a} className={`r-${it.s ? 'series' : it.r ?? 'common'}`} style={{ '--i': k } as React.CSSProperties}><img src={imgUrl(cat!, it)!} alt={it.n} width={96} height={96} loading="eager" /></li>
+        )) : Array.from({ length: 10 }, (_, k) => <li key={k} className="skeleton" />)}
+      </ul>
+      {cat && <p className="ribbon-note">On sale {fmtDay(cat, cat.lastDay, true)}. A token makes all of it free.</p>}
+
       <div className="hero-grid">
+        <div className="card want-card">
+          <header className="card-head"><h2>What are you after?</h2><p>Optional. Leave it on Everything to rank by total value.</p></header>
+          <div className="locker-pane">{wantPanel}</div>
+        </div>
+
         <div className="card locker-card">
-          <header className="card-head"><h2>Your locker</h2><p>Stays in your browser. We never ask for your Epic login.</p></header>
+          <header className="card-head"><h2>What do you own?</h2><p>Optional. Stays in your browser, and we never ask for your Epic login.</p></header>
           <div className="tabs locker-tabs" role="tablist" aria-label="How to share your locker">
             <button role="tab" type="button" aria-selected={tab === 'import'} onClick={() => setTab('import')}>One-click import</button>
             <button role="tab" type="button" aria-selected={tab === 'link'} onClick={() => setTab('link')}>Paste a link</button>
@@ -96,8 +109,7 @@ export function Hero({ mode, onMode, cat, loadError, locker, stats, ownedKinds, 
               <div className="chips" role="group" aria-labelledby="own-label">
                 {KINDS.map(k => <button key={k.key} type="button" className="chip pickable" aria-pressed={ownedKinds.has(k.key)} onClick={() => toggleKind(k.key)}>{k.label}</button>)}
               </div>
-              <p className="field-help">Those groups are left out of your totals. It is a rough sketch: you can add single items with the search further down.</p>
-              <button className="btn primary" type="button" onClick={() => { onSkip(); next(); }}>Build my plan<ArrowRight weight="bold" aria-hidden="true" /></button>
+              <p className="field-help">Those groups are left out of your totals. It is a rough sketch: mark single items as owned with the search.</p>
             </div>
           )}
 
@@ -110,16 +122,9 @@ export function Hero({ mode, onMode, cat, loadError, locker, stats, ownedKinds, 
             </p>
           )}
         </div>
-
-        <figure className="card shelf" aria-label="Items on sale in the shop right now">
-          <header className="card-head"><h2>On sale now</h2>{cat && <p>{fmtDay(cat, cat.lastDay, true)}. A token makes all of it free.</p>}</header>
-          <ul className="shelf-grid">
-            {shelf.length ? shelf.map((it, k) => (
-              <li key={it.a} className={`r-${it.s ? 'series' : it.r ?? 'common'}`} style={{ '--i': k } as React.CSSProperties}><img src={imgUrl(cat!, it)!} alt={it.n} width={128} height={128} loading="eager" /></li>
-            )) : Array.from({ length: 10 }, (_, k) => <li key={k} className="skeleton" />)}
-          </ul>
-        </figure>
       </div>
+
+      <button className="btn primary cta" type="button" onClick={() => { onSkip(); next(); }}>Chart my 14 days<ArrowRight weight="bold" aria-hidden="true" /></button>
     </section>
   );
 }

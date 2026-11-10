@@ -1,22 +1,38 @@
-import { est, fmt, fmtDay, type TodayCheck } from '../lib/analysis.ts';
-import type { Catalog } from '../lib/types.ts';
+import { CalendarPlus } from '@phosphor-icons/react';
+import { CLAIM_BY_2026, est, fmt, fmtDay, type TodayCheck } from '../lib/analysis.ts';
+import { saveReminder } from '../lib/share.ts';
+import type { Catalog, Item } from '../lib/types.ts';
 import { ItemTile } from './ItemTile.tsx';
 
-export function TodayPanel({ cat, today, hasLocker }: { cat: Catalog; today: TodayCheck; hasLocker: boolean }) {
+/** The daily question: start the pass now, or wait? */
+export function TodayPanel({ cat, today, hasLocker, onOpen }: { cat: Catalog; today: TodayCheck; hasLocker: boolean; onOpen: (it: Item) => void }) {
   const pct = Math.round(today.percentile * 100);
-  const verdict = pct >= 85 ? 'A strong day to start.' : pct >= 60 ? 'Better than most days.' : pct >= 35 ? 'An ordinary day.' : 'A thin day. Waiting costs you little.';
+  const go = pct >= 85, fine = pct >= 60;
+  const call = go ? 'Start today' : fine ? 'Good, not great' : 'Wait';
+  const line = go ? 'Days this strong are rare. If you hold a token, today is a good day to claim it.'
+    : fine ? 'Better than most days, but stronger shelves turn up a few times a month.' : 'An ordinary shelf. Waiting costs you little.';
+  const daysLeft = Math.ceil((CLAIM_BY_2026 - Date.now()) / 86400000);
+  const top = Math.max(...today.recent, 1);
   return (
     <section className="wrap section today" id="today">
       <div className="today-copy">
-        <h2>Should you start today?</h2>
-        <p className="today-big"><b>{fmt(today.value)}</b> V-Bucks {hasLocker ? 'you do not own are' : 'are'} on sale right now.</p>
-        <p className="today-verdict">{verdict}</p>
-        <p className="muted">
-          That beats {pct}% of days in the last year (a typical day shows {fmt(today.typical)}). Passes started on days like this ended up near {est(today.expectedPass)} V-Bucks, against {fmt(today.typicalPass)} for a typical start.
-        </p>
-        <p className="footnote">Shop data as of {fmtDay(cat, today.day, true)}. The shop resets daily at 00:00 UTC.</p>
+        <p className="cap">Claim or wait, {fmtDay(cat, today.day, true)}</p>
+        <h2 className={`today-call ${go ? 'go' : fine ? 'fine' : 'wait'}`}>{call}</h2>
+        <p className="today-line">{line}</p>
+        <div className="today-bars" role="img" aria-label={`V-Bucks on sale per day over the last 30 days. Today beats ${pct}% of the last year.`}>
+          {today.recent.map((v, k) => <span key={k} className={k === today.recent.length - 1 ? 'now' : ''} style={{ height: `${Math.max(4, (v / top) * 100)}%` }} />)}
+        </div>
+        <p className="muted small">Last 30 days of the shop{hasLocker ? ', counting only what you do not own' : ''}. Today is the gold bar.</p>
+        <dl className="today-facts">
+          <div><dt>On sale now{hasLocker ? ', new to you' : ''}</dt><dd>{fmt(today.value)}</dd></div>
+          <div><dt>Beats this share of days</dt><dd>{pct}%</dd></div>
+          <div><dt>Passes started on days like this</dt><dd>{est(today.expectedPass)}</dd></div>
+          {daysLeft >= 0 && <div><dt>Days left to claim the 2026 pass</dt><dd>{daysLeft}</dd></div>}
+        </dl>
+        {daysLeft >= 0 && <button type="button" className="btn ghost" onClick={() => saveReminder(new Date(CLAIM_BY_2026), 'Last day to claim the 2026 Pirate Shop Access', 'The 2026 pass must be claimed by today. Check Plunder Planner for whether an earlier day is better.')}>
+          <CalendarPlus weight="bold" aria-hidden="true" />Remind me of the deadline</button>}
       </div>
-      <ul className="tiles compact">{today.onSale.slice(0, 8).map(it => <ItemTile key={it.a} cat={cat} item={it} />)}</ul>
+      <ul className="tiles compact">{today.onSale.slice(0, 8).map(it => <ItemTile key={it.a} cat={cat} item={it} onOpen={onOpen} />)}</ul>
     </section>
   );
 }

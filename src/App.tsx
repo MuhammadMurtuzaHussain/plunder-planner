@@ -1,35 +1,41 @@
 import { useEffect, useMemo, useState } from 'react';
 import { baseline, forecast, hydrate, scoreWindows, type Baseline, type Filter, type Forecast } from './lib/model.ts';
-import { KINDS, TYPE_GROUPS, buildStarts, kindMasks, lockerStats, ownedMask, pickBest, themeMask, todayCheck, unionMask, windowDetail, yearBounds } from './lib/analysis.ts';
-import type { Catalog, ItemType, RawCatalog } from './lib/types.ts';
+import { KINDS, TYPE_GROUPS, buildStarts, kindMasks, lockerStats, ownedMask, pickBest, receipts as buildReceipts, themeMask, todayCheck, unionMask, windowDetail, yearBounds, type Receipts } from './lib/analysis.ts';
+import type { Catalog, Item, ItemType, RawCatalog } from './lib/types.ts';
 import { decodeIdFragment, type Locker } from './lib/locker.ts';
-import { ItemSearch } from './components/ItemSearch.tsx';
 import { Hero } from './components/Hero.tsx';
-import { Verdict } from './components/Verdict.tsx';
+import { Poster } from './components/Poster.tsx';
+import { YearStrip } from './components/YearStrip.tsx';
+import { Wishlist } from './components/Wishlist.tsx';
+import { ItemDialog } from './components/ItemDialog.tsx';
+import { ItemSearch } from './components/ItemSearch.tsx';
 import { Timeline } from './components/Timeline.tsx';
 import { WindowPanel } from './components/WindowPanel.tsx';
 import { TodayPanel } from './components/TodayPanel.tsx';
 import { Method } from './components/Method.tsx';
 import { Hunt } from './components/Hunt.tsx';
 
-// Shareable links: ?start=empty opens the plan without a locker, ?mode=hunt the token-hunt view, ?want=winter a season.
+// Shareable links: ?start=empty opens the plan straight away, ?mode=hunt the token-hunt view,
+// ?want=winter a season or collab family, ?source=collab only crossovers, ?item=Krampus an item page.
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 
 interface Engine { cat: Catalog; f: Forecast; base: Baseline; kinds: Map<string, Uint8Array> }
 
 export default function App() {
   const [engine, setEngine] = useState<Engine | null>(null);
+  const [receipts, setReceipts] = useState<Receipts | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [locker, setLocker] = useState<Locker | null>(null);
-  const [started, setStarted] = useState(query.get('start') === 'empty');            // true once a locker is read or skipped
-  const [off, setOff] = useState<Set<string>>(new Set());   // filter chips switched off
-  const [selected, setSelected] = useState<number | null>(null);
-  const [want, setWant] = useState<Set<string>>(() => new Set((query.get('want') ?? '').split(',').filter(k => KINDS.some(t => t.key === k))));  // seasons and collab families the player is after
-  const [ownedKinds, setOwnedKinds] = useState<Set<string>>(new Set());   // "I own most of these", for players without a locker link
-  const [pickWant, setPickWant] = useState<number[]>([]);                 // single items marked as wanted (catalogue indexes)
-  const [pickOwn, setPickOwn] = useState<number[]>([]);                   // single items marked as owned
+  const [started, setStarted] = useState(query.get('start') === 'empty');   // true once the visitor asks for a plan
+  const [off, setOff] = useState<Set<string>>(new Set());                   // item-type chips switched off
+  const [selected, setSelected] = useState<number | null>(null);            // window on screen; null follows the best pick
+  const [want, setWant] = useState<Set<string>>(() => new Set((query.get('want') ?? '').split(',').filter(k => KINDS.some(t => t.key === k))));
+  const [ownedKinds, setOwnedKinds] = useState<Set<string>>(new Set());     // "I own most of these"
+  const [pickWant, setPickWant] = useState<number[]>([]);                   // single items wanted (catalogue indexes)
+  const [pickOwn, setPickOwn] = useState<number[]>([]);                     // single items owned
   const [source, setSource] = useState<Filter['source']>(() => (query.get('source') === 'collab' ? 'collab' : query.get('source') === 'original' ? 'original' : 'all'));
-  const [mode, setMode] = useState<'have' | 'hunt'>(query.get('mode') === 'hunt' ? 'hunt' : 'have');   // does the player hold a token yet?
+  const [mode, setMode] = useState<'have' | 'hunt'>(query.get('mode') === 'hunt' ? 'hunt' : 'have');
+  const [open, setOpen] = useState<Item | null>(null);                      // item page on screen
 
   // The import button on fortnite.gg lands here with the locker after the #. Read it, then clean the address bar.
   useEffect(() => {
@@ -46,14 +52,23 @@ export default function App() {
       .then(raw => {
         if (!alive) return;
         const cat = hydrate(raw), starts = buildStarts(cat);
-        // Let the page paint before the half-second of number crunching.
+        // Let the page paint before the number crunching; the look-back forecast can wait a little longer still.
         setTimeout(() => alive && setEngine({ cat, f: forecast(cat, cat.lastDay, starts), base: baseline(cat, cat.lastDay, starts), kinds: kindMasks(cat, themeMask(cat)) }), 30);
+        setTimeout(() => alive && setReceipts(buildReceipts(cat)), 1500);
       })
       .catch(() => alive && setLoadError('The shop history could not be loaded. Check your connection and reload.'));
     return () => { alive = false; };
   }, []);
 
-  const types = useMemo<Filter>(() => {
+  // ?item=Krampus opens that item's page, so "when is it coming back?" can be shared as a link.
+  useEffect(() => {
+    const name = query.get('item')?.trim().toLowerCase();
+    if (!engine || !name) return;
+    const hit = engine.cat.items.find(i => i.n.toLowerCase() === name) ?? engine.cat.items.find(i => i.n.toLowerCase().includes(name));
+    if (hit) setOpen(hit);
+  }, [engine]);
+
+  const filter = useMemo<Filter>(() => {
     const s = new Set<ItemType>();
     for (const g of TYPE_GROUPS) if (!off.has(g.key)) for (const t of g.types) s.add(t);
     return { types: s, source };
@@ -66,7 +81,7 @@ export default function App() {
     const owned = unionMask(n, [ownedMask(cat, locker?.ids ?? null), ...[...ownedKinds].map(k => engine.kinds.get(k))], pickOwn)!;
     const focus = unionMask(n, [...want].map(k => engine.kinds.get(k)), pickWant);
     const get = focus ? (s: { focus: number }) => s.focus : undefined;
-    const scores = scoreWindows(cat, f, base, owned, types, focus);
+    const scores = scoreWindows(cat, f, base, owned, filter, focus);
     const { end26, start27 } = yearBounds(cat);
     const i26 = scores.findLastIndex(s => s.start <= end26), i27 = scores.findIndex(s => s.start >= start27);
     return {
@@ -75,20 +90,38 @@ export default function App() {
       pick27: pickBest(scores, i27, scores.length - 1, get),
       split: { i26, i27 },
       stats: lockerStats(cat, locker?.ids ?? null, owned),
-      today: todayCheck(cat, owned, types),
+      today: todayCheck(cat, owned, filter),
     };
-  }, [engine, locker, types, want, ownedKinds, pickWant, pickOwn]);
+  }, [engine, locker, filter, want, ownedKinds, pickWant, pickOwn]);
 
-  const sel = selected ?? view?.pick27?.index ?? 0;
+  // Until the visitor picks a date, follow the best start: the 2026 pass while it can still be claimed, else 2027.
+  const sel = selected ?? view?.pick26?.index ?? view?.pick27?.index ?? 0;
   const detail = useMemo(() => {
     if (!engine || !view) return null;
-    return windowDetail(engine.cat, engine.f, sel, view.owned, types, engine.base.level, engine.base.season[sel], view.focus);
-  }, [engine, view, sel, types]);
+    return windowDetail(engine.cat, engine.f, sel, view.owned, filter, engine.base.level, engine.base.season[sel], view.focus);
+  }, [engine, view, sel, filter]);
 
   const names = KINDS.filter(t => want.has(t.key)).map(t => t.noun);
   const focusName = pickWant.length ? (names.length ? 'chosen' : 'wishlist') : names.length ? (names.length > 2 ? 'chosen' : names.join(' and ')) : null;
   const personal = !!locker || ownedKinds.size > 0 || pickOwn.length > 0;   // do we know anything about what they own?
   const show = started && engine && view && detail;
+
+  const markWant = (i: number) => { setPickOwn(p => p.filter(x => x !== i)); setPickWant(p => (p.includes(i) ? p : [...p, i])); setSelected(null); };
+  const markOwn = (i: number) => { setPickWant(p => p.filter(x => x !== i)); setPickOwn(p => (p.includes(i) ? p : [...p, i])); setSelected(null); };
+  const unmark = (i: number) => { setPickWant(p => p.filter(x => x !== i)); setPickOwn(p => p.filter(x => x !== i)); setSelected(null); };
+
+  const wantPanel = (
+    <>
+      <div className="chips" role="group" aria-label="What you are after">
+        <button type="button" className="chip pickable" aria-pressed={want.size === 0 && pickWant.length === 0} onClick={() => { setWant(new Set()); setPickWant([]); setSelected(null); }}>Everything</button>
+        {KINDS.map(t => (
+          <button key={t.key} type="button" className="chip pickable" aria-pressed={want.has(t.key)}
+            onClick={() => { setWant(prev => { const n = new Set(prev); if (n.has(t.key)) n.delete(t.key); else n.add(t.key); return n; }); setSelected(null); }}>{t.label}</button>
+        ))}
+      </div>
+      {engine ? <ItemSearch cat={engine.cat} want={pickWant} own={pickOwn} onWant={markWant} onOwn={markOwn} onRemove={unmark} /> : <div className="skeleton" />}
+    </>
+  );
 
   return (
     <>
@@ -106,11 +139,11 @@ export default function App() {
 
       <main id="top">
         <Hero
-          mode={mode} onMode={setMode}
+          mode={mode} onMode={setMode} wantPanel={wantPanel}
           cat={engine?.cat ?? null} loadError={loadError} locker={locker} stats={view?.stats ?? null}
           ownedKinds={ownedKinds} onOwnedKinds={s => { setOwnedKinds(s); setSelected(null); }}
           onLocker={l => { setLocker(l); setStarted(true); setSelected(null); }}
-          onSkip={() => { setLocker(null); setStarted(true); setSelected(null); }}
+          onSkip={() => { setStarted(true); setSelected(null); }}
         />
 
         {mode === 'hunt' && <Hunt passValue={Math.max(view?.pick26?.score.total ?? 0, view?.pick27?.score.total ?? 0)} hasLocker={personal} />}
@@ -122,51 +155,50 @@ export default function App() {
         {show && (
           <>
             <section className="wrap section" id="plan">
-              <Verdict cat={engine.cat} pick26={view.pick26} pick27={view.pick27} hasLocker={personal} hunting={mode === 'hunt'} relError={engine.base.relError} focusName={focusName}
-                selected={sel} onSelect={setSelected} />
-              <div className="want">
-                <p className="cap" id="want-label">What are you after?</p>
-                <div className="chips" role="group" aria-labelledby="want-label">
-                  <button type="button" className="chip pickable" aria-pressed={want.size === 0 && pickWant.length === 0} onClick={() => { setWant(new Set()); setPickWant([]); setSelected(null); }}>Everything</button>
-                  {KINDS.map(t => (
-                    <button key={t.key} type="button" className="chip pickable" aria-pressed={want.has(t.key)}
-                      onClick={() => { setWant(prev => { const n = new Set(prev); if (n.has(t.key)) n.delete(t.key); else n.add(t.key); return n; }); setSelected(null); }}>
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-                <ItemSearch cat={engine.cat} want={pickWant} own={pickOwn}
-                  onWant={i => { setPickOwn(p => p.filter(x => x !== i)); setPickWant(p => [...p, i]); setSelected(null); }}
-                  onOwn={i => { setPickWant(p => p.filter(x => x !== i)); setPickOwn(p => [...p, i]); setSelected(null); }}
-                  onRemove={i => { setPickWant(p => p.filter(x => x !== i)); setPickOwn(p => p.filter(x => x !== i)); setSelected(null); }} />
+              <Poster cat={engine.cat} score={view.scores[sel]} index={sel} detail={detail} pick26={view.pick26} pick27={view.pick27} in26={sel <= view.split.i26}
+                personal={personal} hunting={mode === 'hunt'} focusName={focusName} relError={engine.base.relError} onSelect={setSelected} onOpen={setOpen} />
+              <YearStrip cat={engine.cat} scores={view.scores} split={view.split} picks={[view.pick26?.index ?? -1, view.pick27?.index ?? -1]}
+                selected={sel} onSelect={setSelected} focusName={focusName} personal={personal} />
+              <Wishlist cat={engine.cat} f={engine.f} want={pickWant} selected={sel} onSelect={setSelected} onOpen={setOpen} />
+
+              <details className="refine">
+                <summary>Refine what counts</summary>
                 <p className="cap" id="source-label">Collabs or Fortnite originals?</p>
                 <div className="chips" role="group" aria-labelledby="source-label">
                   {([['all', 'Both'], ['collab', 'Collabs only'], ['original', 'Originals only']] as const).map(([k, label]) => (
                     <button key={k} type="button" className="chip pickable" aria-pressed={source === k} onClick={() => { setSource(k); setSelected(null); }}>{label}</button>
                   ))}
                 </div>
-                <p className="cap" id="types-label">Count these item types</p>
-              </div>
-              <div className="chips" role="group" aria-labelledby="types-label">
-                {TYPE_GROUPS.map(g => {
-                  const on = !off.has(g.key);
-                  return (
-                    <button key={g.key} type="button" className="chip" aria-pressed={on}
-                      onClick={() => setOff(prev => { const n = new Set(prev); if (on) { if (n.size < TYPE_GROUPS.length - 1) n.add(g.key); } else n.delete(g.key); return n; })}>
-                      {g.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <Timeline cat={engine.cat} scores={view.scores} split={view.split} picks={[view.pick26?.index ?? -1, view.pick27?.index ?? -1]}
-                selected={sel} onSelect={setSelected} hasLocker={personal} focusName={focusName} />
-              <WindowPanel cat={engine.cat} score={view.scores[sel]} detail={detail} hasLocker={personal} focusName={focusName} />
+                <p className="cap" id="types-label">Item types</p>
+                <div className="chips" role="group" aria-labelledby="types-label">
+                  {TYPE_GROUPS.map(g => {
+                    const on = !off.has(g.key);
+                    return (
+                      <button key={g.key} type="button" className="chip" aria-pressed={on}
+                        onClick={() => setOff(prev => { const n = new Set(prev); if (on) { if (n.size < TYPE_GROUPS.length - 1) n.add(g.key); } else n.delete(g.key); return n; })}>{g.label}</button>
+                    );
+                  })}
+                </div>
+              </details>
+
+              <WindowPanel cat={engine.cat} score={view.scores[sel]} detail={detail} hasLocker={personal} focusName={focusName} onOpen={setOpen} />
+
+              <details className="refine">
+                <summary>Show the year as a line chart</summary>
+                <Timeline cat={engine.cat} scores={view.scores} split={view.split} picks={[view.pick26?.index ?? -1, view.pick27?.index ?? -1]}
+                  selected={sel} onSelect={setSelected} hasLocker={personal} focusName={focusName} />
+              </details>
             </section>
-            <TodayPanel cat={engine.cat} today={view.today} hasLocker={personal} />
+            <TodayPanel cat={engine.cat} today={view.today} hasLocker={personal} onOpen={setOpen} />
           </>
         )}
-        <Method cat={engine?.cat ?? null} />
+        <Method cat={engine?.cat ?? null} receipts={receipts} />
       </main>
+
+      {engine && (
+        <ItemDialog cat={engine.cat} f={engine.f} item={open} wanted={!!open && pickWant.includes(open.idx)} owned={!!open && (pickOwn.includes(open.idx) || !!view?.owned[open.idx])}
+          onClose={() => setOpen(null)} onWant={markWant} onOwn={markOwn} onRemove={unmark} onSelect={w => { setSelected(w); document.getElementById('plan')?.scrollIntoView({ behavior: 'smooth' }); }} />
+      )}
 
       <footer className="wrap footer">
         <p className="credit">Built by <a href="https://github.com/MuhammadMurtuzaHussain" target="_blank" rel="noreferrer">Muhammad Murtuza Hussain</a>. Open source under the MIT licence: <a href="https://github.com/MuhammadMurtuzaHussain/plunder-planner" target="_blank" rel="noreferrer">view the code on GitHub</a>.</p>
