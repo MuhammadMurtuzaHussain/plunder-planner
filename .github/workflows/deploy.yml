@@ -3,10 +3,12 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 6 * * *'   # daily: pick up new Treasure Hour announcements
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -24,6 +26,19 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Refresh Treasure Hour data
+        # A failed refresh should not block a normal code deploy, but should fail the daily check loudly.
+        continue-on-error: ${{ github.event_name == 'push' }}
+        run: node scripts/update_hunt.ts
+      - name: Commit refreshed data
+        run: |
+          if ! git diff --quiet -- src/lib/hunt-data.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add src/lib/hunt-data.json
+            git commit -m "Update Treasure Hour data from fortnite.bot"
+            git push
+          fi
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:

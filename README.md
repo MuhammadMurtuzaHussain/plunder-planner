@@ -79,7 +79,8 @@ npm run dev
 | `scripts/backtest.ts` | Hides a year of data and scores the forecast against what happened |
 | `src/lib/locker.ts` | Decodes a locker link (base64url, raw deflate, delta-encoded ids) |
 | `src/lib/model.ts` | Per-item chances, shop baseline and window scoring |
-| `src/lib/hunt.ts` | Drop odds and Treasure Hour times |
+| `src/lib/hunt.ts` | Drop odds and Treasure Hour maths, fed by `hunt-data.json` |
+| `scripts/update_hunt.ts` | Daily refresh of `hunt-data.json` from fortnite.bot |
 | `src/components/` | The interface |
 
 ## Refreshing the data
@@ -91,9 +92,10 @@ node scripts/train.ts
 ```
 
 fortnite.gg blocks scripted downloads, so `data/raw/fngg/all.en.js` has to be saved from a normal browser
-session at `https://fortnite.gg/data/items/all.en.js`. The drop odds and Treasure Hour times in
-`src/lib/hunt.ts` are constants and need a manual edit if Epic changes them. The Treasure Hour boost for
-upcoming hours is unconfirmed (past ones were 1.5x or 2x), so the calculator lets you choose.
+session at `https://fortnite.gg/data/items/all.en.js`. Drop odds, Treasure Hour times and boosts live in `src/lib/hunt-data.json`. A daily GitHub Action runs
+`scripts/update_hunt.ts`, which reads them from fortnite.bot/treasure, commits any change and redeploys the
+site. Hours the source only expects (not yet confirmed by Epic) are labelled as such. If the source's page
+layout changes, the script fails on purpose and GitHub emails the repository owner.
 
 ## Credits
 

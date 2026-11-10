@@ -1,0 +1,56 @@
+{
+  "source": "https://fortnite.bot/treasure",
+  "checked": "2026-11-10",
+  "baseOdds": 137500,
+  "huntEnds": "2026-12-05T14:00:00Z",
+  "hours": [
+    {
+      "start": "2026-11-07T19:00:00Z",
+      "end": "2026-11-07T21:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": true
+    },
+    {
+      "start": "2026-11-08T02:00:00Z",
+      "end": "2026-11-08T04:00:00Z",
+      "multiplier": 2,
+      "confirmed": true
+    },
+    {
+      "start": "2026-11-14T19:00:00Z",
+      "end": "2026-11-14T21:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": false
+    },
+    {
+      "start": "2026-11-15T02:00:00Z",
+      "end": "2026-11-15T04:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": false
+    },
+    {
+      "start": "2026-11-21T19:00:00Z",
+      "end": "2026-11-21T21:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": false
+    },
+    {
+      "start": "2026-11-22T02:00:00Z",
+      "end": "2026-11-22T04:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": false
+    },
+    {
+      "start": "2026-11-28T19:00:00Z",
+      "end": "2026-11-28T21:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": false
+    },
+    {
+      "start": "2026-11-29T02:00:00Z",
+      "end": "2026-11-29T04:00:00Z",
+      "multiplier": 1.5,
+      "confirmed": false
+    }
+  ]
+}

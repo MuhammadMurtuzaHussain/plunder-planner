@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TreasureChest } from '@phosphor-icons/react';
-import { BASE_ODDS, DEFAULT_MULTIPLIER, HUNT_ENDS, SEEN_MULTIPLIERS, TREASURE_HOUR_LENGTH_H, countdown, huntOdds, upcomingTreasureHours } from '../lib/hunt.ts';
+import { BASE_ODDS, DATA_CHECKED, HUNT_ENDS, MULTIPLIER_CHOICES, countdown, huntOdds, upcomingTreasureHours, type TreasureHour } from '../lib/hunt.ts';
 import { est, fmt } from '../lib/analysis.ts';
 
 function useNow() {
@@ -10,7 +10,8 @@ function useNow() {
 }
 const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-const slot = (t: number) => `${dayFmt.format(t)}, ${timeFmt.format(t)} to ${timeFmt.format(t + TREASURE_HOUR_LENGTH_H * 3600e3)}`;
+const slot = (h: TreasureHour) => `${dayFmt.format(h.start)}, ${timeFmt.format(h.start)} to ${timeFmt.format(h.end)}`;
+const checkedFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(DATA_CHECKED + 'T12:00:00Z'));
 
 function Slider({ id, label, value, min, max, onChange, help }: { id: string; label: string; value: number; min: number; max: number; onChange: (n: number) => void; help?: string }) {
   return (
@@ -27,11 +28,11 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
   const now = useNow();
   const hours = upcomingTreasureHours(now);
   const next = hours[0];
-  const live = next !== undefined && next <= now;
+  const live = next !== undefined && next.start <= now;
   const [cpm, setCpm] = useState(6);
   const [mpd, setMpd] = useState(5);
   const [th, setTh] = useState(Math.min(2, hours.length));
-  const [mult, setMult] = useState<number>(DEFAULT_MULTIPLIER);
+  const [mult, setMult] = useState<number>(next?.multiplier ?? MULTIPLIER_CHOICES[0]);
   const odds = huntOdds({ chestsPerMatch: cpm, matchesPerDay: mpd, treasureHours: Math.min(th, hours.length), multiplier: mult }, now);
   const over = now >= HUNT_ENDS;
   const pct = odds.chance * 100;
@@ -40,7 +41,7 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
   return (
     <section className="wrap section" id="hunt">
       <h2>Still hunting for a token</h2>
-      <p className="section-lede">Pirate Shop Access drops from chests in normal matches at 1 in {fmt(BASE_ODDS)}. Treasure Hours raise that: past ones gave 1.5x or 2x, and the boost for upcoming ones is not confirmed.</p>
+      <p className="section-lede">Pirate Shop Access drops from chests in normal matches at 1 in {fmt(BASE_ODDS)}. Treasure Hours raise that. Boosts marked expected are not confirmed by Epic yet.</p>
 
       <div className="hunt-grid">
         <div className="hunt-col">
@@ -51,7 +52,7 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
               {next !== undefined ? (
                 <>
                   <p className="cap">{live ? 'Ends in' : 'Starts in'}</p>
-                  <p className="clock" role="timer" aria-live="off">{countdown((live ? next + TREASURE_HOUR_LENGTH_H * 3600e3 : next) - now)}</p>
+                  <p className="clock" role="timer" aria-live="off">{countdown((live ? next.end : next.start) - now)}</p>
                   <p className="muted">{slot(next)}, your time</p>
                 </>
               ) : <p className="muted next-none">No more Treasure Hours are announced.</p>}
@@ -59,13 +60,13 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
           </div>
 
           <div className="card">
-            <header className="card-head"><h3>Treasure Hours</h3><p>Announced times, in your timezone. Boost size not confirmed.</p></header>
+            <header className="card-head"><h3>Treasure Hours</h3><p>In your timezone. Checked daily, last change {checkedFmt}.</p></header>
             {hours.length ? (
               <ul className="rows">
-                {hours.map((t, k) => (
-                  <li key={t}>
-                    <span className="row-main">{slot(t)}</span>
-                    <span className="row-side"><span className="up">Boosted</span>{k === 0 && <span className="badge gold">{live ? 'Live' : 'Next'}</span>}</span>
+                {hours.map((h, k) => (
+                  <li key={h.start}>
+                    <span className="row-main">{slot(h)}</span>
+                    <span className="row-side"><span className="up">{h.multiplier}x</span><span className="badge">{h.confirmed ? 'Confirmed' : 'Expected'}</span>{k === 0 && <span className="badge gold">{live ? 'Live' : 'Next'}</span>}</span>
                   </li>
                 ))}
               </ul>
@@ -84,9 +85,9 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
               <div className="slider">
                 <p className="slider-title" id="mult-label">Boost to assume</p>
                 <div className="mode small" role="group" aria-labelledby="mult-label">
-                  {SEEN_MULTIPLIERS.map(m => <button key={m} type="button" aria-pressed={mult === m} onClick={() => setMult(m)}>{m}x</button>)}
+                  {MULTIPLIER_CHOICES.map(m => <button key={m} type="button" aria-pressed={mult === m} onClick={() => setMult(m)}>{m}x</button>)}
                 </div>
-                <p className="slider-help">Unconfirmed for upcoming hours. 1.5x is the cautious choice.</p>
+                <p className="slider-help">Use the lower figure while upcoming boosts are only expected.</p>
               </div>
             </div>
             <div className="odds-result" aria-live="polite">
@@ -100,7 +101,7 @@ export function Hunt({ passValue, hasLocker }: { passValue: number; hasLocker: b
               </dl>
             </div>
           </div>
-          <p className="card-foot">Treat the token as a lucky bonus, not a goal: play the matches you would play anyway, and time them for Treasure Hours. Odds per fortnite.bot, quoting Epic, as of Nov 9, 2026.</p>
+          <p className="card-foot">Treat the token as a lucky bonus, not a goal: play the matches you would play anyway, and time them for Treasure Hours. Odds and times per fortnite.bot, quoting Epic.</p>
         </div>
       </div>
     </section>

@@ -1,20 +1,19 @@
 /**
  * Figures for players who do not have Pirate Shop Access yet.
- * Odds and Treasure Hour times are as published by fortnite.bot/treasure (quoting Epic) on Nov 9, 2026.
- * They are plain constants so they are easy to update if Epic changes them.
+ * The numbers live in hunt-data.json, refreshed daily from fortnite.bot/treasure by
+ * scripts/update_hunt.ts. Hours marked `confirmed: false` are the site's expectation
+ * (same slots and boost as before), not something Epic has announced.
  */
-export const BASE_ODDS = 137_500;           // 1 in N per chest opened in a normal match
-/** Boosts seen so far for Pirate Shop Access. Epic has not confirmed the boost for upcoming Treasure Hours. */
-export const SEEN_MULTIPLIERS = [1.5, 2] as const;
-export const DEFAULT_MULTIPLIER = 1.5;      // the lower, more common one
-export const TREASURE_HOUR_LENGTH_H = 2;
-export const MATCHES_PER_TREASURE_HOUR = 6; // rough: a 2-hour window fits about six matches
-export const HUNT_ENDS = Date.UTC(2026, 11, 5, 14, 0);
-export const TREASURE_HOURS: number[] = [
-  Date.UTC(2026, 10, 14, 19, 0), Date.UTC(2026, 10, 15, 2, 0),
-  Date.UTC(2026, 10, 21, 19, 0), Date.UTC(2026, 10, 22, 2, 0),
-  Date.UTC(2026, 10, 28, 19, 0), Date.UTC(2026, 10, 29, 2, 0),
-];
+import data from './hunt-data.json' with { type: 'json' };
+
+export interface TreasureHour { start: number; end: number; multiplier: number; confirmed: boolean }
+export const BASE_ODDS: number = data.baseOdds;       // 1 in N per chest opened in a normal match
+export const HUNT_ENDS = Date.parse(data.huntEnds);
+export const DATA_CHECKED: string = data.checked;
+export const TREASURE_HOURS: TreasureHour[] = data.hours.map(h => ({ start: Date.parse(h.start), end: Date.parse(h.end), multiplier: h.multiplier, confirmed: h.confirmed }));
+export const MATCHES_PER_TREASURE_HOUR = 6;           // rough: a 2-hour window fits about six matches
+/** Boosts to offer in the calculator: every value seen so far, plus the usual two. */
+export const MULTIPLIER_CHOICES: number[] = [...new Set([1.5, 2, ...TREASURE_HOURS.map(h => h.multiplier)])].sort((a, b) => a - b);
 
 export interface HuntPlan { chestsPerMatch: number; matchesPerDay: number; treasureHours: number; multiplier: number }
 export interface HuntOdds {
@@ -24,9 +23,7 @@ export interface HuntOdds {
   chestsForEven: number;   // chests needed for a 50% chance at the base rate
 }
 
-export function upcomingTreasureHours(now: number) {
-  return TREASURE_HOURS.filter(t => t + TREASURE_HOUR_LENGTH_H * 3600e3 > now);
-}
+export const upcomingTreasureHours = (now: number) => TREASURE_HOURS.filter(h => h.end > now);
 
 export function huntOdds(plan: HuntPlan, now: number): HuntOdds {
   const daysLeft = Math.max(0, (HUNT_ENDS - now) / 86400e3);
