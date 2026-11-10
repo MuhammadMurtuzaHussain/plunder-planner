@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { CountUp, EASE } from './Motion.tsx';
 import { CalendarPlus, ShareNetwork } from '@phosphor-icons/react';
 import { CLAIM_BY_2026, est, fmtDay, imgUrl, type Pick, type WindowDetail } from '../lib/analysis.ts';
 import { WINDOW, dayToDate, type WindowScore } from '../lib/model.ts';
@@ -14,6 +16,8 @@ interface Props {
 /** The answer, stated once: when to claim, why, and what you are likely to get. */
 export function Poster({ cat, score, index, detail, pick26, pick27, in26: is26, personal, hunting, focusName, relError, onSelect, onOpen }: Props) {
   const [busy, setBusy] = useState(false);
+  const reduce = useReducedMotion();
+  const round = useCallback((n: number) => est(n), []);
   const pick = is26 ? pick26 : pick27;
   const isBest = pick?.index === index;
   const value = focusName ? score.focus : score.total;
@@ -57,9 +61,17 @@ export function Poster({ cat, score, index, detail, pick26, pick27, in26: is26, 
           <button type="button" aria-pressed={!is26} disabled={!pick27} onClick={() => pick27 && onSelect(pick27.index)}>2027 pass</button>
         </div>
         <p className="cap poster-label">{isBest ? (hunting ? 'If you land one, claim it on' : 'Claim it on') : 'You are looking at'}</p>
-        <h2 className="poster-date">{fmtDay(cat, score.start)}<span> to {fmtDay(cat, score.start + WINDOW - 1, true)}</span></h2>
-        <p className="poster-value"><b>{est(value)}</b> {valueLine.replace(/^[\d,]+ /, '')}</p>
-        <ul className="poster-why">{why.map(w => <li key={w}>{w}</li>)}</ul>
+        <div className="poster-date-wrap">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.h2 key={score.start} className="poster-date"
+              initial={reduce ? false : { opacity: 0, y: 26, filter: 'blur(8px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, y: -22, filter: 'blur(8px)' }} transition={{ duration: 0.38, ease: EASE }}>
+              {fmtDay(cat, score.start)}<span> to {fmtDay(cat, score.start + WINDOW - 1, true)}</span>
+            </motion.h2>
+          </AnimatePresence>
+        </div>
+        <p className="poster-value"><b><CountUp value={value} format={round} /></b> {valueLine.replace(/^[\d,]+ /, '')}</p>
+        <ul className="poster-why">{why.map((w, k) => <motion.li key={`${k}${w}`} initial={reduce ? false : { opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.05 * k, ease: EASE }}>{w}</motion.li>)}</ul>
         <div className="poster-actions">
           {!isBest && pick && <button type="button" className="btn primary" onClick={() => onSelect(pick.index)}>Back to best start</button>}
           <button type="button" className="btn ghost" onClick={share} disabled={busy}><ShareNetwork weight="bold" aria-hidden="true" />{busy ? 'Drawing' : 'Save share card'}</button>
@@ -68,13 +80,19 @@ export function Poster({ cat, score, index, detail, pick26, pick27, in26: is26, 
       </div>
       {top.length > 0 && (
         <ul className="poster-fan" aria-label="Most likely items in this fortnight">
-          {top.map(r => {
-            const src = imgUrl(cat, r.item);
-            return (
-              <li key={r.item.a}><button type="button" className={`r-${r.item.s ? 'series' : r.item.r ?? 'common'}`} onClick={() => onOpen(r.item)} aria-label={`${r.item.n}, ${Math.round(r.p * 100)}% chance`}>
-                {src && <img src={src} alt="" loading="lazy" />}<span>{Math.max(1, Math.round(r.p * 100))}%</span></button></li>
-            );
-          })}
+          <AnimatePresence mode="popLayout" initial={false}>
+            {top.map((r, k) => {
+              const src = imgUrl(cat, r.item);
+              return (
+                <motion.li key={r.item.a} layout={!reduce} initial={reduce ? false : { opacity: 0, scale: 0.7, rotate: k % 2 ? 6 : -6 }} animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  exit={{ opacity: 0, scale: 0.7 }} transition={{ type: 'spring', stiffness: 260, damping: 24, delay: reduce ? 0 : k * 0.03 }}>
+                  <motion.button type="button" className={`r-${r.item.s ? 'series' : r.item.r ?? 'common'}`} whileHover={{ y: -4, rotate: k % 2 ? 1.5 : -1.5 }} whileTap={{ scale: 0.96 }}
+                    onClick={() => onOpen(r.item)} aria-label={`${r.item.n}, ${Math.round(r.p * 100)}% chance`}>
+                    {src && <img src={src} alt="" loading="lazy" />}<span>{Math.max(1, Math.round(r.p * 100))}%</span></motion.button>
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
         </ul>
       )}
     </div>

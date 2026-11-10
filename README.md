@@ -5,7 +5,7 @@ Item Shop access would unlock the most cosmetics you do not already own.
 
 **Live site: https://muhammadmurtuzahussain.github.io/plunder-planner/**
 
-![Plunder Planner: say what you want, then one clear answer with the items you are likely to get](docs/overview.png)
+![Plunder Planner: today's shop floating beside the headline, and the live answer below it](docs/overview.png)
 
 ## What it does
 

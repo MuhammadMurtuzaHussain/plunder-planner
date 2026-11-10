@@ -1,130 +1,55 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, CheckCircle, WarningCircle } from '@phosphor-icons/react';
-import { decodeLocker, importBookmarklet, type Locker } from '../lib/locker.ts';
-import { KINDS, TYPE_LABEL, fmt, fmtDay, imgUrl, type LockerStats } from '../lib/analysis.ts';
-import type { Catalog } from '../lib/types.ts';
+import { useMemo } from 'react';
+import { ArrowDown } from '@phosphor-icons/react';
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionStyle, type MotionValue } from 'motion/react';
+import { fmt, fmtDay, imgUrl } from '../lib/analysis.ts';
+import type { Catalog, Item } from '../lib/types.ts';
+import { EASE } from './Motion.tsx';
 
-interface Props {
-  mode: 'have' | 'hunt'; onMode: (m: 'have' | 'hunt') => void;
-  cat: Catalog | null; loadError: string | null; locker: Locker | null; stats: LockerStats | null;
-  ownedKinds: Set<string>; onOwnedKinds: (s: Set<string>) => void;
-  onLocker: (l: Locker) => void; onSkip: () => void;
-  wantPanel: React.ReactNode;   // seasons, collab families and item search, owned by the app
+// Where each floating item sits (percent of the stage), how big it is, and how strongly it follows the pointer.
+const SPOTS = [
+  { x: 6, y: 8, s: 132, d: 26 }, { x: 44, y: 0, s: 96, d: 14 }, { x: 72, y: 12, s: 150, d: 34 }, { x: 24, y: 38, s: 168, d: 40 },
+  { x: 60, y: 46, s: 112, d: 20 }, { x: 2, y: 66, s: 104, d: 16 }, { x: 40, y: 74, s: 124, d: 28 }, { x: 78, y: 70, s: 92, d: 12 },
+];
+
+function Floater({ cat, item, spot, k, mx, my, onOpen }: { cat: Catalog; item: Item; spot: typeof SPOTS[number]; k: number; mx: MotionValue<number>; my: MotionValue<number>; onOpen: (it: Item) => void }) {
+  const x = useTransform(mx, v => v * spot.d), y = useTransform(my, v => v * spot.d);
+  const reduce = useReducedMotion();
+  return (
+    <motion.button type="button" className={`floater r-${item.s ? 'series' : item.r ?? 'common'}`} aria-label={`${item.n}, ${fmt(item.p)} V-Bucks, on sale now`}
+      style={{ left: `${spot.x}%`, top: `${spot.y}%`, width: spot.s, x, y, '--bob': `${5 + (k % 3) * 1.5}s`, '--lag': `${k * -0.9}s` } as unknown as MotionStyle}
+      initial={reduce ? false : { opacity: 0, scale: 0.6, rotate: k % 2 ? 8 : -8 }} animate={{ opacity: 1, scale: 1, rotate: k % 2 ? 3 : -3 }}
+      transition={{ type: 'spring', stiffness: 120, damping: 14, delay: 0.25 + k * 0.07 }}
+      whileHover={{ scale: 1.08, rotate: 0, zIndex: 2 }} whileTap={{ scale: 0.96 }} onClick={() => onOpen(item)}>
+      <img src={imgUrl(cat, item)!} alt="" loading="eager" />
+    </motion.button>
+  );
 }
-type Tab = 'import' | 'link' | 'none';
 
-export function Hero({ mode, onMode, cat, loadError, locker, stats, ownedKinds, onOwnedKinds, onLocker, onSkip, wantPanel }: Props) {
-  const [tab, setTab] = useState<Tab>('import');
-  const [text, setText] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [hint, setHint] = useState(false);
-  const importLink = useRef<HTMLAnchorElement>(null);
-
-  // React refuses javascript: links written in JSX, so the import button gets its address after mounting.
-  useEffect(() => {
-    importLink.current?.setAttribute('href', importBookmarklet(location.origin + location.pathname));
-  }, [tab]);
-
-  // Real shelf: the priciest things on sale on the latest day of data.
+/** One statement, and the shop itself as the picture: today's priciest items float beside it. */
+export function Hero({ cat, onOpen }: { cat: Catalog | null; onOpen: (it: Item) => void }) {
+  const reduce = useReducedMotion();
+  const px = useMotionValue(0), py = useMotionValue(0);
+  const mx = useSpring(px, { stiffness: 60, damping: 18 }), my = useSpring(py, { stiffness: 60, damping: 18 });
   const shelf = useMemo(() => {
     if (!cat) return [];
-    return cat.items.filter(i => i.i && i.t !== 'track' && i.days[i.days.length - 1] === cat.lastDay).sort((a, b) => b.p - a.p).slice(0, 10);
+    return cat.items.filter(i => i.i && i.t === 'outfit' && i.days[i.days.length - 1] === cat.lastDay).sort((a, b) => b.p - a.p).slice(0, SPOTS.length);
   }, [cat]);
-  const goto = (id: string) => requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  const next = () => goto(mode === 'hunt' ? 'hunt' : 'plan');
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true); setError(null);
-    try { onLocker(await decodeLocker(text)); next(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'Could not read that.'); }
-    finally { setBusy(false); }
-  }
-  const toggleKind = (key: string) => { const n = new Set(ownedKinds); if (n.has(key)) n.delete(key); else n.add(key); onOwnedKinds(n); };
+  const line = (delay: number) => ({ initial: reduce ? false : { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.8, delay, ease: EASE } }) as const;
 
   return (
-    <section className="wrap hero">
-      <h1>X marks your best 14 days</h1>
-      <p className="lede">Say what you want from the Item Shop. Nine years of shop history show when to spend your Pirate Shop Access.</p>
-
-      <div className="mode" role="group" aria-label="Do you have a token yet?">
-        <button type="button" aria-pressed={mode === 'have'} onClick={() => onMode('have')}>I have a token</button>
-        <button type="button" aria-pressed={mode === 'hunt'} onClick={() => { onMode('hunt'); goto('hunt'); }}>Still hunting</button>
+    <section className="wrap hero" onPointerMove={e => { if (reduce) return; const r = e.currentTarget.getBoundingClientRect(); px.set((e.clientX - r.left) / r.width - 0.5); py.set((e.clientY - r.top) / r.height - 0.5); }}>
+      <div className="hero-copy">
+        <motion.h1 {...line(0)}>X marks your <em>best 14 days.</em></motion.h1>
+        <motion.p className="lede" {...line(0.12)}>Pirate Shop Access makes the whole Item Shop free for two weeks. <span>Nine years of shop history show which two weeks to pick.</span></motion.p>
+        <motion.div className="hero-actions" {...line(0.24)}>
+          <a className="btn primary" href="#plan">See my best dates<ArrowDown weight="bold" aria-hidden="true" /></a>
+          <a className="btn ghost" href="#hunt">No token yet?</a>
+        </motion.div>
       </div>
-
-      <ul className="ribbon" aria-label="Items on sale in the shop right now">
-        {shelf.length ? shelf.map((it, k) => (
-          <li key={it.a} className={`r-${it.s ? 'series' : it.r ?? 'common'}`} style={{ '--i': k } as React.CSSProperties}><img src={imgUrl(cat!, it)!} alt={it.n} width={96} height={96} loading="eager" /></li>
-        )) : Array.from({ length: 10 }, (_, k) => <li key={k} className="skeleton" />)}
-      </ul>
-      {cat && <p className="ribbon-note">On sale {fmtDay(cat, cat.lastDay, true)}. A token makes all of it free.</p>}
-
-      <div className="hero-grid">
-        <div className="card want-card">
-          <header className="card-head"><h2>What are you after?</h2><p>Optional. Leave it on Everything to rank by total value.</p></header>
-          <div className="locker-pane">{wantPanel}</div>
-        </div>
-
-        <div className="card locker-card">
-          <header className="card-head"><h2>What do you own?</h2><p>Optional. Stays in your browser, and we never ask for your Epic login.</p></header>
-          <div className="tabs locker-tabs" role="tablist" aria-label="How to share your locker">
-            <button role="tab" type="button" aria-selected={tab === 'import'} onClick={() => setTab('import')}>One-click import</button>
-            <button role="tab" type="button" aria-selected={tab === 'link'} onClick={() => setTab('link')}>Paste a link</button>
-            <button role="tab" type="button" aria-selected={tab === 'none'} onClick={() => setTab('none')}>No locker</button>
-          </div>
-
-          {tab === 'import' && (
-            <div className="locker-pane">
-              <ol className="steps">
-                <li>Drag this button to your bookmarks bar:
-                  <a ref={importLink} className="btn primary drag" draggable onClick={e => { e.preventDefault(); setHint(true); }}>Send locker to Plunder Planner</a>
-                  {hint && <span className="field-help" role="status">Drag it up to the bookmarks bar rather than clicking it here. Press Ctrl+Shift+B (Cmd+Shift+B on Mac) if the bar is hidden.</span>}
-                </li>
-                <li>Open your locker on fortnite.gg. The short link (fortnite.gg/locker?id=...) is fine.</li>
-                <li>Click the bookmark. This site opens with your locker loaded.</li>
-              </ol>
-              <p className="field-help">It only reads the item list that page already shows and passes it here after the # in the address, which is never sent to a server. Desktop browsers only.</p>
-            </div>
-          )}
-
-          {tab === 'link' && (
-            <form onSubmit={submit} className="locker-form locker-pane" noValidate>
-              <label htmlFor="locker">Long fortnite.gg link, or a list of item ids</label>
-              <div className="field-row">
-                <input id="locker" name="locker" type="text" inputMode="url" autoComplete="off" spellCheck={false}
-                  placeholder="https://fortnite.gg/my-locker?items=..." value={text} onChange={e => setText(e.target.value)}
-                  aria-describedby="locker-help" aria-invalid={!!error} />
-                <button className="btn primary" type="submit" disabled={busy || !text.trim()}>{busy ? 'Reading' : 'Read my locker'}<ArrowRight weight="bold" aria-hidden="true" /></button>
-              </div>
-              {error
-                ? <p className="field-error" role="alert"><WarningCircle weight="fill" aria-hidden="true" />{error}</p>
-                : <p className="field-help" id="locker-help">For links that contain "my-locker?items=". Bots that create these need access to your Epic account, so only use one you already trust. The other two tabs need no login at all.</p>}
-            </form>
-          )}
-
-          {tab === 'none' && (
-            <div className="locker-pane">
-              <p className="pane-label" id="own-label">Tick what you already own most of</p>
-              <div className="chips" role="group" aria-labelledby="own-label">
-                {KINDS.map(k => <button key={k.key} type="button" className="chip pickable" aria-pressed={ownedKinds.has(k.key)} onClick={() => toggleKind(k.key)}>{k.label}</button>)}
-              </div>
-              <p className="field-help">Those groups are left out of your totals. It is a rough sketch: mark single items as owned with the search.</p>
-            </div>
-          )}
-
-          {loadError && <p className="field-error locker-pane" role="alert"><WarningCircle weight="fill" aria-hidden="true" />{loadError}</p>}
-          {stats && stats.shopItems > 0 && (
-            <p className="locker-ok" role="status">
-              <CheckCircle weight="fill" aria-hidden="true" />
-              <span>{locker ? `Read ${fmt(stats.read)} cosmetics. ${fmt(stats.shopItems)} are Item Shop items` : `Counting ${fmt(stats.shopItems)} Item Shop items as owned`} worth {fmt(stats.shopValue)} V-Bucks
-                {stats.byType[0] ? `, mostly ${TYPE_LABEL[stats.byType[0].type].toLowerCase()}` : ''}.</span>
-            </p>
-          )}
-        </div>
+      <div className="hero-stage" aria-label="Items on sale in the shop right now">
+        {cat && shelf.map((it, k) => <Floater key={it.a} cat={cat} item={it} spot={SPOTS[k]} k={k} mx={mx} my={my} onOpen={onOpen} />)}
+        {cat && <motion.p className="stage-note" {...line(1)}>On sale {fmtDay(cat, cat.lastDay, true)}. A token makes all of it free.</motion.p>}
       </div>
-
-      <button className="btn primary cta" type="button" onClick={() => { onSkip(); next(); }}>Chart my 14 days<ArrowRight weight="bold" aria-hidden="true" /></button>
     </section>
   );
 }

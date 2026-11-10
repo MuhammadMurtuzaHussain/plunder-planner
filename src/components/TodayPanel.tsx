@@ -1,4 +1,7 @@
+import { useCallback } from 'react';
 import { CalendarPlus } from '@phosphor-icons/react';
+import { motion, useReducedMotion } from 'motion/react';
+import { CountUp } from './Motion.tsx';
 import { CLAIM_BY_2026, est, fmt, fmtDay, type TodayCheck } from '../lib/analysis.ts';
 import { saveReminder } from '../lib/share.ts';
 import type { Catalog, Item } from '../lib/types.ts';
@@ -13,6 +16,8 @@ export function TodayPanel({ cat, today, hasLocker, onOpen }: { cat: Catalog; to
     : fine ? 'Better than most days, but stronger shelves turn up a few times a month.' : 'An ordinary shelf. Waiting costs you little.';
   const daysLeft = Math.ceil((CLAIM_BY_2026 - Date.now()) / 86400000);
   const top = Math.max(...today.recent, 1);
+  const reduce = useReducedMotion();
+  const whole = useCallback((n: number) => fmt(n), []);
   return (
     <section className="wrap section today" id="today">
       <div className="today-copy">
@@ -20,11 +25,12 @@ export function TodayPanel({ cat, today, hasLocker, onOpen }: { cat: Catalog; to
         <h2 className={`today-call ${go ? 'go' : fine ? 'fine' : 'wait'}`}>{call}</h2>
         <p className="today-line">{line}</p>
         <div className="today-bars" role="img" aria-label={`V-Bucks on sale per day over the last 30 days. Today beats ${pct}% of the last year.`}>
-          {today.recent.map((v, k) => <span key={k} className={k === today.recent.length - 1 ? 'now' : ''} style={{ height: `${Math.max(4, (v / top) * 100)}%` }} />)}
+          {today.recent.map((v, k) => <motion.span key={k} className={k === today.recent.length - 1 ? 'now' : ''} style={{ height: `${Math.max(4, (v / top) * 100)}%`, originY: 1 }}
+            initial={reduce ? false : { scaleY: 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true, amount: 0.6 }} transition={{ type: 'spring', stiffness: 140, damping: 18, delay: k * 0.018 }} />)}
         </div>
         <p className="muted small">Last 30 days of the shop{hasLocker ? ', counting only what you do not own' : ''}. Today is the gold bar.</p>
         <dl className="today-facts">
-          <div><dt>On sale now{hasLocker ? ', new to you' : ''}</dt><dd>{fmt(today.value)}</dd></div>
+          <div><dt>On sale now{hasLocker ? ', new to you' : ''}</dt><dd><CountUp value={today.value} format={whole} /></dd></div>
           <div><dt>Beats this share of days</dt><dd>{pct}%</dd></div>
           <div><dt>Passes started on days like this</dt><dd>{est(today.expectedPass)}</dd></div>
           {daysLeft >= 0 && <div><dt>Days left to claim the 2026 pass</dt><dd>{daysLeft}</dd></div>}
