@@ -5,7 +5,7 @@ interface Props { cat: Catalog; pick26: Pick | null; pick27: Pick | null; hasLoc
 
 function Card({ cat, title, pick, relError, focusName, active, onSelect }: { cat: Catalog; title: string; pick: Pick | null; relError: number; focusName: string | null; active: boolean; onSelect: (i: number) => void }) {
   if (!pick) return (
-    <div className="verdict-card"><h3>{title}</h3><p className="muted">No full 14-day stretch is left in this year.</p></div>
+    <div className="verdict-card"><h3><span className="badge gold">{title}</span></h3><p className="muted">The claim deadline for this pass has passed.</p></div>
   );
   const pct = Math.round(pick.edge * 100);
   if (focusName) return (
@@ -33,7 +33,7 @@ export function Verdict({ cat, pick26, pick27, hasLocker, hunting, relError, foc
       <h2>{hunting ? 'If you land one, use it here' : hasLocker ? 'Your best 14 days' : 'Best 14 days for an empty locker'}</h2>
       <p className="section-lede">{focusName ? `Ranked by the ${focusName} items you do not own that are likely to be on sale. Seasonal items return on a reliable schedule, so this ranking is steadier than the overall one.` : `Expected value of everything on sale during the pass, minus what you already own. Give or take about ${Math.round(relError * 100)}%.`}</p>
       <div className="verdict-grid">
-        <Card cat={cat} title="2026 pass" pick={pick26} relError={relError} focusName={focusName} active={pick26?.index === selected} onSelect={onSelect} />
+        <Card cat={cat} title="2026 pass, claim by Dec 15" pick={pick26} relError={relError} focusName={focusName} active={pick26?.index === selected} onSelect={onSelect} />
         <Card cat={cat} title="2027 pass" pick={pick27} relError={relError} focusName={focusName} active={pick27?.index === selected} onSelect={onSelect} />
       </div>
     </div>

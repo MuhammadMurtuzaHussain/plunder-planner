@@ -1,5 +1,5 @@
 /** Everything the screens need, derived from the catalogue + a locker. */
-import { WINDOW, dateToDay, dayToDate, type Forecast, type WindowScore } from './model.ts';
+import { WINDOW, dateToDay, dayToDate, passes, type Filter, type Forecast, type WindowScore } from './model.ts';
 import type { Catalog, Item, ItemType } from './types.ts';
 
 export const TYPE_LABEL: Record<ItemType, string> = {
@@ -44,9 +44,10 @@ export function buildStarts(cat: Catalog): Int32Array {
   const last = dateToDay(cat.epoch, new Date(Date.UTC(2027, 11, 31))) - WINDOW + 1;
   return Int32Array.from({ length: last - cat.lastDay }, (_, k) => cat.lastDay + 1 + k);
 }
-/** Passes cannot straddle the new year: the 2026 one must end by Dec 31, 2026. */
+/** The 2026 pass has to be claimed (started) by Dec 15, 2026; its 14 days then run on from there. */
+export const CLAIM_BY_2026 = Date.UTC(2026, 11, 15);
 export function yearBounds(cat: Catalog) {
-  const end26 = dateToDay(cat.epoch, new Date(Date.UTC(2026, 11, 31))) - WINDOW + 1;
+  const end26 = dateToDay(cat.epoch, new Date(CLAIM_BY_2026));
   const start27 = dateToDay(cat.epoch, new Date(Date.UTC(2027, 0, 1)));
   return { end26, start27 };
 }
@@ -111,12 +112,12 @@ export interface WindowDetail {
   yours: Ranked[];       // owned, ranked the same way
   byType: { type: ItemType; shop: number; owned: number }[];
 }
-export function windowDetail(cat: Catalog, f: Forecast, w: number, owned: Uint8Array, types: Set<ItemType>, levels: Map<ItemType, number>, season: number, focus?: Uint8Array | null): WindowDetail {
+export function windowDetail(cat: Catalog, f: Forecast, w: number, owned: Uint8Array, filter: Filter, levels: Map<string, number>, season: number, focus?: Uint8Array | null): WindowDetail {
   const likely: Ranked[] = [], yours: Ranked[] = [];
   const ownedBy = new Map<ItemType, number>();
   const off = w * f.nItems;
   for (const it of cat.items) {
-    if (!types.has(it.t)) continue;
+    if (!passes(it, filter)) continue;
     const p = f.p[off + it.idx];
     if (p < 0.01) continue;
     if (owned[it.idx]) { yours.push({ item: it, p }); ownedBy.set(it.t, (ownedBy.get(it.t) ?? 0) + p * it.p); }
@@ -124,7 +125,12 @@ export function windowDetail(cat: Catalog, f: Forecast, w: number, owned: Uint8A
   }
   const rank = (a: Ranked, b: Ranked) => b.p * b.item.p - a.p * a.item.p;
   likely.sort(rank); yours.sort(rank);
-  const byType = [...levels].filter(([t]) => types.has(t)).map(([type, lvl]) => ({ type, shop: lvl * season, owned: ownedBy.get(type) ?? 0 }))
+  const shopBy = new Map<ItemType, number>();
+  for (const [key, lvl] of levels) {
+    const [t, src] = key.split('|') as [ItemType, string];
+    if (filter.types.has(t) && (filter.source === 'all' || filter.source === src)) shopBy.set(t, (shopBy.get(t) ?? 0) + lvl * season);
+  }
+  const byType = [...shopBy].map(([type, shop]) => ({ type, shop, owned: ownedBy.get(type) ?? 0 }))
     .sort((a, b) => (b.shop - b.owned) - (a.shop - a.owned));
   return { likely, yours, byType };
 }
@@ -139,13 +145,13 @@ export interface TodayCheck {
   typicalPass: number;
 }
 /** How does the shop right now compare with the last year of days, for this locker? */
-export function todayCheck(cat: Catalog, owned: Uint8Array, types: Set<ItemType>): TodayCheck {
+export function todayCheck(cat: Catalog, owned: Uint8Array, filter: Filter): TodayCheck {
   const N = cat.lastDay + 1, span = 365 + WINDOW;
   const from = N - span;
   const dayVal = new Float64Array(span), winVal = new Float64Array(span);
   const onSale: Item[] = [];
   for (const it of cat.items) {
-    if (owned[it.idx] || !types.has(it.t)) continue;
+    if (owned[it.idx] || !passes(it, filter)) continue;
     let prev = -1;
     for (const d of it.days) {
       if (d >= from) {

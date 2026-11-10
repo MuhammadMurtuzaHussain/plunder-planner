@@ -23,6 +23,11 @@ FNGG_TYPES = {1: 'outfit', 2: 'backpack', 3: 'pickaxe', 4: 'glider', 5: 'contrai
               24: 'instrument', 25: 'instrument', 17: 'car', 18: 'car', 19: 'car', 29: 'car', 30: 'car',
               27: 'lego', 28: 'lego'}
 
+FNGG_COLLAB_TAG = 18
+ORIGINAL_SERIES = {None, 'Slurp', 'Dark', 'Frozen', 'Shadow', 'Lava'}
+# Brand-new licensed sets that fortnite.gg has not tagged yet. Add to this when a new crossover launches.
+EXTRA_COLLAB_SETS = {'one piece', 'lil uzi vert', 'a$ap rocky'}
+
 def api_items():
     d = json.load(open(os.path.join(ROOT, 'data/raw/cosmetics_all.json')))['data']
     for cat, rows in d.items():
@@ -61,6 +66,12 @@ def main():
     def fdate(v):  # 261108 -> day index
         s = str(v); return (dt.date(2000 + int(s[:2]), int(s[2:4]), int(s[4:6])) - EPOCH).days
 
+    # A set is a collab if most of its items are tagged as one: new additions to old crossovers are often untagged.
+    tagged = collections.defaultdict(list)
+    for f in fitems:
+        if 'set' in f: tagged[f['set']].append(FNGG_COLLAB_TAG in f.get('t', []))
+    collab_sets = {s for s, v in tagged.items() if sum(v) * 2 >= len(v)}
+    collab_sets |= {i for i, name in enumerate(sets) if name in EXTRA_COLLAB_SETS}
     used, rows, unmatched_priced = set(), [], 0
     for f in fitems:
         t = FNGG_TYPES.get(f['type'])
@@ -86,8 +97,12 @@ def main():
         if not p:  # only ever sold inside a bundle or with an outfit: no standalone value
             stats['no_standalone_price'] += 1; continue
         deltas = [a['hist'][0]] + [b - c for b, c in zip(a['hist'][1:], a['hist'])]
-        out.append({'g': f['id'], 'a': a['id'], 'n': f['name'], 't': a['type'], 'r': a['rarity'],
-                    's': a['series'], 'e': a['set'], 'p': p, 'i': a['img'], 'h': deltas})
+        row = {'g': f['id'], 'a': a['id'], 'n': f['name'], 't': a['type'], 'r': a['rarity'],
+               's': a['series'], 'e': a['set'], 'p': p, 'i': a['img'], 'h': deltas}
+        # Collab = licensed crossover. fortnite.gg tags these (tag 18); branded series and jam tracks count too.
+        if FNGG_COLLAB_TAG in f.get('t', []) or f.get('set') in collab_sets or a['series'] not in ORIGINAL_SERIES or a['type'] == 'track':
+            row['c'] = 1
+        out.append(row)
         stats['items'] += 1
     stats['api_hist_unmatched'] = sum(1 for a in api if a['hist'] and a['id'] not in matched_api)
     stats['fngg_priced_seen_unmatched'] = unmatched_priced

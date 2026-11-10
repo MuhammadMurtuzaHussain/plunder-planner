@@ -89,7 +89,7 @@ export function Timeline({ cat, scores: raw, split, picks, selected, onSelect, h
           {g.months.map(m => (<text key={m.i} className={`axis${/^\d/.test(m.label) ? ' strong' : ''}`} x={g.x(m.i)} y={height - 12} textAnchor="middle">{m.label}</text>))}
           {split.i26 >= 0 && split.i27 > 0 && (
             <g><rect className="gap" x={g.x(split.i26)} width={g.x(split.i27) - g.x(split.i26)} y={M.top} height={g.ih} />
-              <text className="axis" x={(g.x(split.i26) + g.x(split.i27)) / 2} y={M.top - 10} textAnchor="middle">crosses New Year</text></g>
+              <text className="axis" x={(g.x(split.i26) + g.x(split.i27)) / 2} y={M.top - 10} textAnchor="middle">no pass can start here</text></g>
           )}
           <path className="band" d={g.band} />
           {showShop && <path className="series neutral" d={g.shop} />}

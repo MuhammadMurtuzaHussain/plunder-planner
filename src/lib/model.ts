@@ -16,6 +16,12 @@ import type { Catalog, Item, ItemType, RawCatalog } from './types.ts';
 
 export const WINDOW = 14;
 
+/** Which items count: by type, and by collab versus Fortnite original. */
+export interface Filter { types: Set<ItemType>; source: 'all' | 'collab' | 'original' }
+export const passes = (it: Item, f: Filter) => f.types.has(it.t) && (f.source === 'all' || (f.source === 'collab') === !!it.c);
+const kindKey = (it: Item) => `${it.t}|${it.c ? 'collab' : 'original'}`;
+const kindPasses = (key: string, f: Filter) => { const [t, src] = key.split('|'); return f.types.has(t as ItemType) && (f.source === 'all' || f.source === src); };
+
 import coef from './coefficients.json' with { type: 'json' };
 
 /** Logistic-regression weights, fitted by scripts/train.ts on past seasons. */
@@ -169,11 +175,12 @@ export function forecast(cat: Catalog, asOf: number, starts: Int32Array, params:
   return { starts, nItems: n, p, asOf };
 }
 
-/** Total V-Bucks on sale in every 14-day window of recorded history, split by item type. */
-export function historicTotals(cat: Catalog, upTo: number): Map<ItemType, Float64Array> {
-  const N = upTo - WINDOW + 2, out = new Map<ItemType, Float64Array>();
+/** Total V-Bucks on sale in every 14-day window of recorded history, split by item type and collab/original. */
+export function historicTotals(cat: Catalog, upTo: number): Map<string, Float64Array> {
+  const N = upTo - WINDOW + 2, out = new Map<string, Float64Array>();
   for (const it of cat.items) {
-    let arr = out.get(it.t); if (!arr) { arr = new Float64Array(N); out.set(it.t, arr); }
+    const key = kindKey(it);
+    let arr = out.get(key); if (!arr) { arr = new Float64Array(N); out.set(key, arr); }
     let prev = -1;
     for (const d of it.days) {
       if (d > upTo) break;
@@ -185,8 +192,8 @@ export function historicTotals(cat: Catalog, upTo: number): Map<ItemType, Float6
 }
 
 export interface Baseline {
-  /** Average V-Bucks per 14-day window over the last year, by item type. */
-  level: Map<ItemType, number>;
+  /** Average V-Bucks per 14-day window over the last year, keyed "type|collab" or "type|original". */
+  level: Map<string, number>;
   /** Seasonal multiplier per candidate window (around 1). */
   season: Float32Array;
   /** Typical relative error of the shop-total estimate, from backtests. */
@@ -199,7 +206,7 @@ export function baseline(cat: Catalog, asOf: number, starts: Int32Array): Baseli
   const totals = historicTotals(cat, asOf);
   const N = asOf - WINDOW + 2;
   const all = new Float64Array(N);
-  const level = new Map<ItemType, number>();
+  const level = new Map<string, number>();
   for (const [t, arr] of totals) {
     let s = 0; for (let d = N - 365; d < N; d++) s += arr[d];
     level.set(t, s / 365);
@@ -237,13 +244,13 @@ export interface WindowScore {
   focusSd: number;
 }
 
-/** `owned[i]` is 1 when item i is in the locker. Only item types in `types` are counted. */
-export function scoreWindows(cat: Catalog, f: Forecast, base: Baseline, owned: Uint8Array, types: Set<ItemType>, focus?: Uint8Array | null): WindowScore[] {
+/** `owned[i]` is 1 when item i is in the locker. Only items passing `filter` are counted. */
+export function scoreWindows(cat: Catalog, f: Forecast, base: Baseline, owned: Uint8Array, filter: Filter, focus?: Uint8Array | null): WindowScore[] {
   const n = f.nItems, out: WindowScore[] = [];
   const value = new Float32Array(n);
-  for (let i = 0; i < n; i++) value[i] = owned[i] && types.has(cat.items[i].t) ? cat.items[i].p : 0;
+  for (let i = 0; i < n; i++) value[i] = owned[i] && passes(cat.items[i], filter) ? cat.items[i].p : 0;
   let level = 0;
-  for (const [t, v] of base.level) if (types.has(t)) level += v;
+  for (const [k, v] of base.level) if (kindPasses(k, filter)) level += v;
   for (let w = 0; w < f.starts.length; w++) {
     let ev = 0, vr = 0; const off = w * n;
     for (let i = 0; i < n; i++) {
@@ -253,7 +260,7 @@ export function scoreWindows(cat: Catalog, f: Forecast, base: Baseline, owned: U
     }
     let fv = 0, fr = 0;
     if (focus) for (let i = 0; i < n; i++) {
-      if (!focus[i] || owned[i] || !types.has(cat.items[i].t)) continue;
+      if (!focus[i] || owned[i] || !passes(cat.items[i], filter)) continue;
       const q = f.p[off + i], v = cat.items[i].p;
       fv += q * v; fr += q * (1 - q) * v * v;
     }

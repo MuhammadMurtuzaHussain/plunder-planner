@@ -11,6 +11,7 @@ export interface RawItem {
   r: string | null;     // rarity
   s: string | null;     // series (collab family)
   e: string | null;     // set
+  c?: 1;                // collab (licensed crossover) rather than a Fortnite original
   p: number;            // V-Bucks price
   i: string | null;     // image url ("~" = imgPrefix)
   h: number[];          // delta-encoded day indices the item was in the shop

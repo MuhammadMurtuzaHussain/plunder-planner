@@ -8,7 +8,7 @@ import { decodeLocker } from '../src/lib/locker.ts';
 import type { ItemType } from '../src/lib/types.ts';
 
 const cat = hydrate(JSON.parse(readFileSync(new URL('../public/data/catalog.json', import.meta.url), 'utf8')));
-const ALL = new Set(cat.items.map(i => i.t)) as Set<ItemType>;
+const ALL = { types: new Set(cat.items.map(i => i.t)) as Set<ItemType>, source: 'all' as const };
 const lockerIds = process.argv[2] ? (await decodeLocker(readFileSync(process.argv[2], 'utf8'))).ids : new Set<number>();
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
 const pearson = (a: number[], b: number[]) => {

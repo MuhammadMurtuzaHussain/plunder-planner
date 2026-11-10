@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { baseline, forecast, hydrate, scoreWindows, type Baseline, type Forecast } from './lib/model.ts';
+import { baseline, forecast, hydrate, scoreWindows, type Baseline, type Filter, type Forecast } from './lib/model.ts';
 import { THEMES, TYPE_GROUPS, buildStarts, lockerStats, ownedMask, pickBest, themeMask, todayCheck, windowDetail, yearBounds } from './lib/analysis.ts';
 import type { Catalog, ItemType, RawCatalog } from './lib/types.ts';
 import type { Locker } from './lib/locker.ts';
@@ -24,6 +24,7 @@ export default function App() {
   const [off, setOff] = useState<Set<string>>(new Set());   // filter chips switched off
   const [selected, setSelected] = useState<number | null>(null);
   const [want, setWant] = useState<Set<string>>(() => new Set((query.get('want') ?? '').split(',').filter(k => THEMES.some(t => t.key === k))));  // seasonal themes the player is after
+  const [source, setSource] = useState<Filter['source']>(() => (query.get('source') === 'collab' ? 'collab' : query.get('source') === 'original' ? 'original' : 'all'));
   const [mode, setMode] = useState<'have' | 'hunt'>(query.get('mode') === 'hunt' ? 'hunt' : 'have');   // does the player hold a token yet?
 
   useEffect(() => {
@@ -40,11 +41,11 @@ export default function App() {
     return () => { alive = false; };
   }, []);
 
-  const types = useMemo(() => {
+  const types = useMemo<Filter>(() => {
     const s = new Set<ItemType>();
     for (const g of TYPE_GROUPS) if (!off.has(g.key)) for (const t of g.types) s.add(t);
-    return s;
-  }, [off]);
+    return { types: s, source };
+  }, [off, source]);
 
   const view = useMemo(() => {
     if (!engine) return null;
@@ -118,6 +119,12 @@ export default function App() {
                       onClick={() => { setWant(prev => { const n = new Set(prev); if (n.has(t.key)) n.delete(t.key); else n.add(t.key); return n; }); setSelected(null); }}>
                       {t.label}
                     </button>
+                  ))}
+                </div>
+                <p className="cap" id="source-label">Collabs or Fortnite originals?</p>
+                <div className="chips" role="group" aria-labelledby="source-label">
+                  {([['all', 'Both'], ['collab', 'Collabs only'], ['original', 'Originals only']] as const).map(([k, label]) => (
+                    <button key={k} type="button" className="chip pickable" aria-pressed={source === k} onClick={() => { setSource(k); setSelected(null); }}>{label}</button>
                   ))}
                 </div>
                 <p className="cap" id="types-label">Count these item types</p>

@@ -12,12 +12,14 @@ Item Shop access would unlock the most cosmetics you do not already own.
 - **Reads your locker privately.** A fortnite.gg "Copy link" URL contains the whole locker in compressed form.
   It is unpacked in your browser. No account, no server, no tracking, no AI model.
 - **Ranks every 14-day pass through 2027.** Each start date gets an expected value: everything the shop should
-  sell in those 14 days, minus what you already own. You get one pick for the 2026 pass and one for 2027.
+  sell in those 14 days, minus what you already own. You get one pick for the 2026 pass (which must be claimed by Dec 15, 2026) and one for 2027.
 - **Shows what you would likely get.** For any fortnight, the items most likely to be on sale that are new to
   you, each with its chance, plus the items you own that are likely to take up shelf space.
 - **Answers "should I start today?"** Compares the live shop with the last year of days for your locker.
 - **Helps players still hunting for a token.** Treasure Hour countdown, the announced schedule in your
   timezone, and a calculator for your chance of a drop before the hunt ends.
+- **Collabs or originals.** Count only licensed crossovers, or only Fortnite's own designs, if that is what you
+  care about.
 - **Lets you chase a season.** Pick winter, Halloween, summer, Valentine's or spring and the calendar is
   re-ranked by the seasonal items you are missing.
 
@@ -35,6 +37,7 @@ Item Shop access would unlock the most cosmetics you do not already own.
 |---|---|
 | `?start=empty` | The plan for an empty locker |
 | `?start=empty&mode=hunt` | The token-hunt view |
+| `?start=empty&source=collab` | Only collab items counted (also `original`) |
 | `?start=empty&want=winter` | The calendar ranked by winter items (also `halloween`, `summer`, `valentine`, `spring`) |
 
 ## How the estimate works
