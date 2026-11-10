@@ -9,8 +9,14 @@ Item Shop access would unlock the most cosmetics you do not already own.
 
 ## What it does
 
-- **Reads your locker privately.** A fortnite.gg "Copy link" URL contains the whole locker in compressed form.
-  It is unpacked in your browser. No account, no server, no tracking, no AI model.
+- **Three ways to say what you own, none of which need your Epic login.**
+  - *One-click import:* drag a button to your bookmarks bar, open your fortnite.gg locker (the short
+    `locker?id=` link works) and click it. It reads the item list that page already shows and hands it to
+    this site after the `#` in the address, which never reaches a server.
+  - *Paste a link:* a long `my-locker?items=` link, or a plain list of fortnite.gg item ids.
+  - *No locker:* tick the groups you own most of (Marvel, winter, Chapter 1 originals and so on) and add
+    single items with the search.
+- **Nothing leaves your browser.** No account, no server, no tracking, no AI model.
 - **Ranks every 14-day pass through 2027.** Each start date gets an expected value: everything the shop should
   sell in those 14 days, minus what you already own. You get one pick for the 2026 pass (which must be claimed by Dec 15, 2026) and one for 2027.
 - **Shows what you would likely get.** For any fortnight, the items most likely to be on sale that are new to
@@ -20,8 +26,14 @@ Item Shop access would unlock the most cosmetics you do not already own.
   timezone, and a calculator for your chance of a drop before the hunt ends.
 - **Collabs or originals.** Count only licensed crossovers, or only Fortnite's own designs, if that is what you
   care about.
-- **Lets you chase a season.** Pick winter, Halloween, summer, Valentine's or spring and the calendar is
-  re-ranked by the seasonal items you are missing.
+- **Lets you chase what you want.** Pick a season, a collab family, or search for specific items, and the
+  calendar is re-ranked by the ones you are missing.
+
+### A note on locker bots
+
+Discord bots that produce a `my-locker?items=` link do it by linking to your Epic account. That gives a third
+party access to the account, and there are reports of scams and of V-Bucks being spent. Plunder Planner never
+asks for an Epic login, and the import button and the no-locker mode avoid those bots entirely.
 
 ### Still hunting
 
@@ -80,7 +92,7 @@ npm run dev
 | `scripts/build_dataset.py` | Joins the two data sources into `public/data/catalog.json` |
 | `scripts/train.ts` | Fits the logistic regression weights in `src/lib/coefficients.json` |
 | `scripts/backtest.ts` | Hides a year of data and scores the forecast against what happened |
-| `src/lib/locker.ts` | Decodes a locker link (base64url, raw deflate, delta-encoded ids) |
+| `src/lib/locker.ts` | Decodes locker links and id lists, and builds the import bookmarklet |
 | `src/lib/model.ts` | Per-item chances, shop baseline and window scoring |
 | `src/lib/hunt.ts` | Drop odds and Treasure Hour maths, fed by `hunt-data.json` |
 | `scripts/update_hunt.ts` | Daily refresh of `hunt-data.json` from fortnite.bot |

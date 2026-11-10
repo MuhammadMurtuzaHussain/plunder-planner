@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { baseline, forecast, hydrate, scoreWindows, type Baseline, type Filter, type Forecast } from './lib/model.ts';
-import { THEMES, TYPE_GROUPS, buildStarts, lockerStats, ownedMask, pickBest, themeMask, todayCheck, windowDetail, yearBounds } from './lib/analysis.ts';
+import { KINDS, TYPE_GROUPS, buildStarts, kindMasks, lockerStats, ownedMask, pickBest, themeMask, todayCheck, unionMask, windowDetail, yearBounds } from './lib/analysis.ts';
 import type { Catalog, ItemType, RawCatalog } from './lib/types.ts';
-import type { Locker } from './lib/locker.ts';
+import { decodeIdFragment, type Locker } from './lib/locker.ts';
+import { ItemSearch } from './components/ItemSearch.tsx';
 import { Hero } from './components/Hero.tsx';
 import { Verdict } from './components/Verdict.tsx';
 import { Timeline } from './components/Timeline.tsx';
@@ -14,7 +15,7 @@ import { Hunt } from './components/Hunt.tsx';
 // Shareable links: ?start=empty opens the plan without a locker, ?mode=hunt the token-hunt view, ?want=winter a season.
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 
-interface Engine { cat: Catalog; f: Forecast; base: Baseline; themes: Uint8Array }
+interface Engine { cat: Catalog; f: Forecast; base: Baseline; kinds: Map<string, Uint8Array> }
 
 export default function App() {
   const [engine, setEngine] = useState<Engine | null>(null);
@@ -23,9 +24,20 @@ export default function App() {
   const [started, setStarted] = useState(query.get('start') === 'empty');            // true once a locker is read or skipped
   const [off, setOff] = useState<Set<string>>(new Set());   // filter chips switched off
   const [selected, setSelected] = useState<number | null>(null);
-  const [want, setWant] = useState<Set<string>>(() => new Set((query.get('want') ?? '').split(',').filter(k => THEMES.some(t => t.key === k))));  // seasonal themes the player is after
+  const [want, setWant] = useState<Set<string>>(() => new Set((query.get('want') ?? '').split(',').filter(k => KINDS.some(t => t.key === k))));  // seasons and collab families the player is after
+  const [ownedKinds, setOwnedKinds] = useState<Set<string>>(new Set());   // "I own most of these", for players without a locker link
+  const [pickWant, setPickWant] = useState<number[]>([]);                 // single items marked as wanted (catalogue indexes)
+  const [pickOwn, setPickOwn] = useState<number[]>([]);                   // single items marked as owned
   const [source, setSource] = useState<Filter['source']>(() => (query.get('source') === 'collab' ? 'collab' : query.get('source') === 'original' ? 'original' : 'all'));
   const [mode, setMode] = useState<'have' | 'hunt'>(query.get('mode') === 'hunt' ? 'hunt' : 'have');   // does the player hold a token yet?
+
+  // The import button on fortnite.gg lands here with the locker after the #. Read it, then clean the address bar.
+  useEffect(() => {
+    const m = location.hash.match(/^#locker=([0-9a-z.]+)$/);
+    if (!m) return;
+    try { setLocker(decodeIdFragment(m[1])); setStarted(true); } catch { /* damaged link: fall back to the normal start */ }
+    history.replaceState(null, '', location.pathname + location.search);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -35,7 +47,7 @@ export default function App() {
         if (!alive) return;
         const cat = hydrate(raw), starts = buildStarts(cat);
         // Let the page paint before the half-second of number crunching.
-        setTimeout(() => alive && setEngine({ cat, f: forecast(cat, cat.lastDay, starts), base: baseline(cat, cat.lastDay, starts), themes: themeMask(cat) }), 30);
+        setTimeout(() => alive && setEngine({ cat, f: forecast(cat, cat.lastDay, starts), base: baseline(cat, cat.lastDay, starts), kinds: kindMasks(cat, themeMask(cat)) }), 30);
       })
       .catch(() => alive && setLoadError('The shop history could not be loaded. Check your connection and reload.'));
     return () => { alive = false; };
@@ -50,9 +62,9 @@ export default function App() {
   const view = useMemo(() => {
     if (!engine) return null;
     const { cat, f, base } = engine;
-    const owned = ownedMask(cat, locker?.ids ?? null);
-    const wanted = THEMES.map((t, i) => (want.has(t.key) ? i + 1 : 0)).filter(Boolean);
-    const focus = wanted.length ? Uint8Array.from(engine.themes, v => (wanted.includes(v) ? 1 : 0)) : null;
+    const n = cat.items.length;
+    const owned = unionMask(n, [ownedMask(cat, locker?.ids ?? null), ...[...ownedKinds].map(k => engine.kinds.get(k))], pickOwn)!;
+    const focus = unionMask(n, [...want].map(k => engine.kinds.get(k)), pickWant);
     const get = focus ? (s: { focus: number }) => s.focus : undefined;
     const scores = scoreWindows(cat, f, base, owned, types, focus);
     const { end26, start27 } = yearBounds(cat);
@@ -62,10 +74,10 @@ export default function App() {
       pick26: i26 >= 0 ? pickBest(scores, 0, i26, get) : null,
       pick27: pickBest(scores, i27, scores.length - 1, get),
       split: { i26, i27 },
-      stats: locker ? lockerStats(cat, locker.ids, owned) : null,
+      stats: lockerStats(cat, locker?.ids ?? null, owned),
       today: todayCheck(cat, owned, types),
     };
-  }, [engine, locker, types, want]);
+  }, [engine, locker, types, want, ownedKinds, pickWant, pickOwn]);
 
   const sel = selected ?? view?.pick27?.index ?? 0;
   const detail = useMemo(() => {
@@ -73,8 +85,9 @@ export default function App() {
     return windowDetail(engine.cat, engine.f, sel, view.owned, types, engine.base.level, engine.base.season[sel], view.focus);
   }, [engine, view, sel, types]);
 
-  const names = THEMES.filter(t => want.has(t.key)).map(t => t.noun);
-  const focusName = names.length ? (names.length > 2 ? 'seasonal' : names.join(' and ')) : null;
+  const names = KINDS.filter(t => want.has(t.key)).map(t => t.noun);
+  const focusName = pickWant.length ? (names.length ? 'chosen' : 'wishlist') : names.length ? (names.length > 2 ? 'chosen' : names.join(' and ')) : null;
+  const personal = !!locker || ownedKinds.size > 0 || pickOwn.length > 0;   // do we know anything about what they own?
   const show = started && engine && view && detail;
 
   return (
@@ -95,11 +108,12 @@ export default function App() {
         <Hero
           mode={mode} onMode={setMode}
           cat={engine?.cat ?? null} loadError={loadError} locker={locker} stats={view?.stats ?? null}
+          ownedKinds={ownedKinds} onOwnedKinds={s => { setOwnedKinds(s); setSelected(null); }}
           onLocker={l => { setLocker(l); setStarted(true); setSelected(null); }}
           onSkip={() => { setLocker(null); setStarted(true); setSelected(null); }}
         />
 
-        {mode === 'hunt' && <Hunt passValue={Math.max(view?.pick26?.score.total ?? 0, view?.pick27?.score.total ?? 0)} hasLocker={!!locker} />}
+        {mode === 'hunt' && <Hunt passValue={Math.max(view?.pick26?.score.total ?? 0, view?.pick27?.score.total ?? 0)} hasLocker={personal} />}
 
         {started && !show && !loadError && (
           <section className="wrap section" aria-busy="true"><div className="skeleton tall" /><div className="skeleton" /></section>
@@ -108,19 +122,23 @@ export default function App() {
         {show && (
           <>
             <section className="wrap section" id="plan">
-              <Verdict cat={engine.cat} pick26={view.pick26} pick27={view.pick27} hasLocker={!!locker} hunting={mode === 'hunt'} relError={engine.base.relError} focusName={focusName}
+              <Verdict cat={engine.cat} pick26={view.pick26} pick27={view.pick27} hasLocker={personal} hunting={mode === 'hunt'} relError={engine.base.relError} focusName={focusName}
                 selected={sel} onSelect={setSelected} />
               <div className="want">
                 <p className="cap" id="want-label">What are you after?</p>
                 <div className="chips" role="group" aria-labelledby="want-label">
-                  <button type="button" className="chip pickable" aria-pressed={want.size === 0} onClick={() => { setWant(new Set()); setSelected(null); }}>Everything</button>
-                  {THEMES.map(t => (
+                  <button type="button" className="chip pickable" aria-pressed={want.size === 0 && pickWant.length === 0} onClick={() => { setWant(new Set()); setPickWant([]); setSelected(null); }}>Everything</button>
+                  {KINDS.map(t => (
                     <button key={t.key} type="button" className="chip pickable" aria-pressed={want.has(t.key)}
                       onClick={() => { setWant(prev => { const n = new Set(prev); if (n.has(t.key)) n.delete(t.key); else n.add(t.key); return n; }); setSelected(null); }}>
                       {t.label}
                     </button>
                   ))}
                 </div>
+                <ItemSearch cat={engine.cat} want={pickWant} own={pickOwn}
+                  onWant={i => { setPickOwn(p => p.filter(x => x !== i)); setPickWant(p => [...p, i]); setSelected(null); }}
+                  onOwn={i => { setPickWant(p => p.filter(x => x !== i)); setPickOwn(p => [...p, i]); setSelected(null); }}
+                  onRemove={i => { setPickWant(p => p.filter(x => x !== i)); setPickOwn(p => p.filter(x => x !== i)); setSelected(null); }} />
                 <p className="cap" id="source-label">Collabs or Fortnite originals?</p>
                 <div className="chips" role="group" aria-labelledby="source-label">
                   {([['all', 'Both'], ['collab', 'Collabs only'], ['original', 'Originals only']] as const).map(([k, label]) => (
@@ -141,10 +159,10 @@ export default function App() {
                 })}
               </div>
               <Timeline cat={engine.cat} scores={view.scores} split={view.split} picks={[view.pick26?.index ?? -1, view.pick27?.index ?? -1]}
-                selected={sel} onSelect={setSelected} hasLocker={!!locker} focusName={focusName} />
-              <WindowPanel cat={engine.cat} score={view.scores[sel]} detail={detail} hasLocker={!!locker} focusName={focusName} />
+                selected={sel} onSelect={setSelected} hasLocker={personal} focusName={focusName} />
+              <WindowPanel cat={engine.cat} score={view.scores[sel]} detail={detail} hasLocker={personal} focusName={focusName} />
             </section>
-            <TodayPanel cat={engine.cat} today={view.today} hasLocker={!!locker} />
+            <TodayPanel cat={engine.cat} today={view.today} hasLocker={personal} />
           </>
         )}
         <Method cat={engine?.cat ?? null} />

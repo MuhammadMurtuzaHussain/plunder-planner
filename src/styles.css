@@ -88,6 +88,37 @@ b, strong { font-weight: 600; }
 .shelf-grid li { aspect-ratio: 1; border-radius: 8px; overflow: hidden; }
 .shelf-grid img { width: 100%; height: 100%; object-fit: cover; }
 
+.tabs.locker-tabs { margin: 0 20px 16px; background: var(--bg); }
+.locker-pane { padding: 0 20px; }
+.locker-form.locker-pane { padding: 0 20px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 12px; list-style: decimal; font-size: 0.93rem; }
+.steps li::marker { color: var(--accent); font-weight: 700; }
+.steps .btn { display: flex; width: fit-content; margin-top: 8px; }
+.steps .field-help { display: block; margin-top: 8px; }
+.btn.drag { cursor: grab; text-decoration: none; }
+.locker-pane > .field-help { margin-top: 14px; }
+.locker-pane .chips { margin: 10px 0 12px; }
+.locker-pane > .btn { margin-top: 16px; }
+.pane-label { font-size: 0.88rem; font-weight: 600; }
+.search { margin: 4px 0 20px; max-width: 640px; }
+.search input { display: block; width: 100%; height: 44px; margin-top: 10px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); font: 400 0.92rem/1 var(--sans); }
+.search input::placeholder { color: var(--faint); }
+.search input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.search .field-help { margin-top: 6px; }
+.search-results { margin-top: 10px; background: var(--card); border-radius: 16px; overflow: hidden; }
+.search-results li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line-soft); }
+.search-results li:first-child { border-top: 0; }
+.search-results .tile-img { width: 40px; height: 40px; display: block; }
+.search-name { display: grid; min-width: 0; }
+.search-name b { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.search-name span { color: var(--muted); font-size: 0.76rem; }
+.search-results .chip { background: var(--raised); height: 30px; }
+.search-none { margin-top: 10px; color: var(--muted); font-size: 0.88rem; }
+.picked { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.picked li { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 4px; border-radius: 8px; background: var(--card); font-size: 0.85rem; font-weight: 600; }
+.picked button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 6px; background: var(--raised); color: var(--muted); cursor: pointer; }
+.picked button:hover { color: var(--text); }
+
 /* rarity tiles: colour sits behind the item art only */
 .r-legendary, .r-mythic { background: linear-gradient(160deg, #f7b733, #c2570c); }
 .r-epic { background: linear-gradient(160deg, #c46bff, #6a1fc2); }

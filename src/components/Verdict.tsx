@@ -13,7 +13,7 @@ function Card({ cat, title, pick, relError, focusName, active, onSelect }: { cat
       <h3><span className="badge gold">{title}</span></h3>
       <p className="verdict-date">{fmtRange(cat, pick.score.start)}</p>
       <p className="verdict-value"><b>{est(pick.value)}</b> V-Bucks of {focusName} items you do not own</p>
-      <p className="muted">{pick.value < 500 ? `Hardly any ${focusName} items are expected in this year's remaining dates. ` : `A typical fortnight has ${est(pick.median)}. `}The whole pass here is worth about {est(pick.score.total)}.</p>
+      <p className="muted">{pick.value < 500 ? `Your ${focusName} items rarely return, so no fortnight is likely to have them. This is their best shot. ` : `A typical fortnight has ${est(pick.median)}. `}The whole pass here is worth about {est(pick.score.total)}.</p>
     </button>
   );
   const strength = pick.edge >= relError * 1.5 ? 'A clear lead over a typical fortnight.' : pick.edge >= relError * 0.5 ? 'A modest lead. Nearby dates are close.' : 'Barely ahead. Any fortnight is about as good.';
@@ -30,7 +30,7 @@ function Card({ cat, title, pick, relError, focusName, active, onSelect }: { cat
 export function Verdict({ cat, pick26, pick27, hasLocker, hunting, relError, focusName, selected, onSelect }: Props) {
   return (
     <div className="verdict">
-      <h2>{hunting ? 'If you land one, use it here' : hasLocker ? 'Your best 14 days' : 'Best 14 days for an empty locker'}</h2>
+      <h2>{hunting ? 'If you land one, use it here' : hasLocker ? 'Your best 14 days' : 'Best 14 days if you own nothing'}</h2>
       <p className="section-lede">{focusName ? `Ranked by the ${focusName} items you do not own that are likely to be on sale. Seasonal items return on a reliable schedule, so this ranking is steadier than the overall one.` : `Expected value of everything on sale during the pass, minus what you already own. Give or take about ${Math.round(relError * 100)}%.`}</p>
       <div className="verdict-grid">
         <Card cat={cat} title="2026 pass, claim by Dec 15" pick={pick26} relError={relError} focusName={focusName} active={pick26?.index === selected} onSelect={onSelect} />

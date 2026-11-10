@@ -81,6 +81,38 @@ export const THEMES: Theme[] = [
   { key: 'valentine', label: "Valentine's", noun: "Valentine's", from: [1, 28], to: [2, 17], words: /love|heart|cupid|valentine|sweetheart|crush|romance/i },
   { key: 'spring', label: 'Spring', noun: 'spring', from: [3, 10], to: [4, 25], words: /bunny|egg|spring|easter|clover|lucky|rabbit|blossom|shamrock/i },
 ];
+/** Things a player can say they own most of, or are after: the seasons above plus the big collab families. */
+export interface Kind { key: string; label: string; noun: string; group: 'season' | 'family' }
+const FAMILIES: { key: string; label: string; series: string }[] = [
+  { key: 'marvel', label: 'Marvel', series: 'Marvel' }, { key: 'dc', label: 'DC', series: 'Dc' },
+  { key: 'starwars', label: 'Star Wars', series: 'Star Wars' }, { key: 'icon', label: 'Icon Series', series: 'Icon' },
+  { key: 'gaming', label: 'Gaming Legends', series: 'Gaming Legends' },
+];
+export const KINDS: Kind[] = [
+  ...THEMES.map(t => ({ key: t.key, label: t.label, noun: t.noun, group: 'season' as const })),
+  ...FAMILIES.map(f => ({ key: f.key, label: f.label, noun: f.label, group: 'family' as const })),
+  { key: 'othercollab', label: 'Other collabs', noun: 'collab', group: 'family' },
+  { key: 'og', label: 'Chapter 1 originals', noun: 'Chapter 1', group: 'family' },
+];
+/** One 0/1 mask per kind. `themes` is the output of themeMask. */
+export function kindMasks(cat: Catalog, themes: Uint8Array): Map<string, Uint8Array> {
+  const out = new Map<string, Uint8Array>();
+  THEMES.forEach((t, i) => out.set(t.key, Uint8Array.from(themes, v => (v === i + 1 ? 1 : 0))));
+  for (const f of FAMILIES) out.set(f.key, Uint8Array.from(cat.items, it => (it.s === f.series ? 1 : 0)));
+  const named = new Set(FAMILIES.map(f => f.series));
+  out.set('othercollab', Uint8Array.from(cat.items, it => (it.c && it.t !== 'track' && !(it.s && named.has(it.s)) ? 1 : 0)));
+  const ch2 = dateToDay(cat.epoch, new Date(Date.UTC(2019, 9, 15)));   // Chapter 2 began mid October 2019
+  out.set('og', Uint8Array.from(cat.items, it => (!it.c && it.days[0] < ch2 ? 1 : 0)));
+  return out;
+}
+export function unionMask(n: number, masks: (Uint8Array | undefined)[], extra: number[] = []): Uint8Array | null {
+  if (!masks.some(Boolean) && !extra.length) return null;
+  const out = new Uint8Array(n);
+  for (const m of masks) if (m) for (let i = 0; i < n; i++) if (m[i]) out[i] = 1;
+  for (const i of extra) out[i] = 1;
+  return out;
+}
+
 /** theme index + 1 per item (0 = not seasonal). */
 export function themeMask(cat: Catalog): Uint8Array {
   const out = new Uint8Array(cat.items.length);
@@ -183,8 +215,8 @@ export function todayCheck(cat: Catalog, owned: Uint8Array, filter: Filter): Tod
 }
 
 export interface LockerStats { read: number; shopItems: number; shopValue: number; byType: { type: ItemType; n: number }[] }
-export function lockerStats(cat: Catalog, ids: Set<number>, owned: Uint8Array): LockerStats {
+export function lockerStats(cat: Catalog, ids: Set<number> | null, owned: Uint8Array): LockerStats {
   let shopItems = 0, shopValue = 0; const by = new Map<ItemType, number>();
   for (const it of cat.items) if (owned[it.idx]) { shopItems++; shopValue += it.p; by.set(it.t, (by.get(it.t) ?? 0) + 1); }
-  return { read: ids.size, shopItems, shopValue, byType: [...by].map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n) };
+  return { read: ids?.size ?? 0, shopItems, shopValue, byType: [...by].map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n) };
 }
